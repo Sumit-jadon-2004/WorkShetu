@@ -1,0 +1,33 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "nodemon App.js",
+    "dev": "nodemon App.js",
+    "api": "node App.js",
+    "db:seed": "node DataLisitngs/InitData.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "connect-mongo": "^5.1.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.1",
+    "express-session": "^1.18.2",
+    "helmet": "^8.1.0",
+    "i18next": "^26.4.2",
+    "joi": "^18.0.1",
+    "mongoose": "^9.10.0",
+    "passport": "^0.7.0",
+    "passport-local": "^1.0.0",
+    "react-i18next": "^17.0.14"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

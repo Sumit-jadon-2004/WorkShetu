@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names backend,frontend --prefix name \"npm --prefix Backend run dev\" \"npm --prefix Frontend run dev\"",
+    "start": "npm run dev"
+  },
+  "dependencies": {
+    "mongoose": "^9.10.0",
+    "passport-local-mongoose": "^9.1.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.4"
+  }
+}
