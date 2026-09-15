@@ -1,0 +1,81 @@
+{
+  "machines": {
+    "title": "Farm Machinery",
+    "heroBadge": "Trusted farming equipment near you",
+    "heroTitle": "Power your farming with the right machine.",
+    "heroDescription": "Find tractors, cultivators, rotavators and harvesters from local machine owners.",
+
+    "categories": {
+      "tractor": "Tractor",
+      "cultivator": "Cultivator",
+      "rotavator": "Rotavator",
+      "harrow": "Harrow",
+      "harvester": "Harvester"
+    },
+
+    "units": {
+      "bigha": "Bigha",
+      "acre": "Acre",
+      "hectare": "Hectare",
+      "hour": "Hour",
+      "day": "Day",
+      "trip": "Trip"
+    }
+  },
+
+  "machineDetails": {
+    "communityFeedback": "Community feedback",
+    "reviewsFromFarmers": "Reviews from farmers",
+    "yourName": "Your name",
+    "chooseRating": "Choose rating",
+    "starRating": "{{count}} star rating",
+    "shareExperience": "Share your experience",
+    "addReview": "Add review",
+    "updateReview": "Update review",
+    "cancel": "Cancel",
+    "noReviews": "No reviews yet. Be the first to review this machine.",
+    "farmer": "Farmer",
+    "editReview": "Edit review",
+    "deleteReview": "Delete review",
+    "deleteReviewConfirm": "Delete this review?",
+    "selectRating": "Please select a star rating before submitting.",
+    "reviewSaveError": "Review could not be saved.",
+    "reviewDeleteError": "Review could not be deleted.",
+    "farmMachine": "Farm machine",
+    "agriculturalEquipment": "Agricultural equipment",
+    "saveMachine": "Save machine",
+    "mapTitle": "Machine location map",
+    "groupBookingLower": "group",
+    "fastBookingLower": "fast",
+    "requestReceived": "Request received",
+    "bookMachine": "Book {{title}}",
+    "closeBooking": "Close booking form",
+    "bookingReady": "Your booking request is ready.",
+    "ownerCanReview": "The owner can review your {{type}} booking details after submission.",
+    "done": "Done",
+    "farmLocation": "Farm location",
+    "landArea": "Land area",
+    "areaUnit": "Area unit",
+    "workType": "Work type",
+    "workTypePlaceholder": "For example: ploughing or harvesting",
+    "requiredDate": "Required date",
+    "submitBooking": "Submit booking request"
+  },
+  "navbar": {
+    "home": "Home",
+    "machinery": "Machinery",
+    "services": "Services",
+    "bookings": "My Bookings",
+    "saved": "Saved",
+    "profile": "Profile",
+    "search": "Search",
+    "searchPlaceholder": "Search machines, services...",
+    "language": "Language",
+    "tagline": "Smart Farming",
+    "listMachine": "List your machine",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  }}
+
+
+

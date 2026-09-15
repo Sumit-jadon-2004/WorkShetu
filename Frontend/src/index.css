@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f8fafc;
+  color: #0f172a;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+body.dark {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+body.dark .bg-\[\#f6f8f3\],
+body.dark .bg-\[\#f7f5ed\] {
+  background-color: #0f172a;
+}
+
+body.dark .bg-\[\#f3f6ef\] {
+  background-color: #172033;
+}
+
+body.dark .bg-white {
+  background-color: #1e293b;
+}
+
+body.dark .bg-gray-50,
+body.dark .bg-gray-100,
+body.dark .bg-slate-50 {
+  background-color: #172033;
+}
+
+body.dark .text-gray-900,
+body.dark .text-gray-950,
+body.dark .text-slate-900,
+body.dark .text-slate-800 {
+  color: #f1f5f9;
+}
+
+body.dark .text-gray-700,
+body.dark .text-gray-600,
+body.dark .text-gray-500,
+body.dark .text-gray-400,
+body.dark .text-slate-700,
+body.dark .text-slate-600,
+body.dark .text-slate-500,
+body.dark .text-slate-400 {
+  color: #cbd5e1;
+}
+
+body.dark .text-green-700,
+body.dark .text-green-800,
+body.dark .text-\[\#14532d\],
+body.dark .text-\[\#18321f\] {
+  color: #86efac;
+}
+
+body.dark .text-slate-900,
+body.dark .text-slate-800,
+body.dark .text-gray-900,
+body.dark .text-gray-950 {
+  color: #f1f5f9;
+}
+
+body.dark .border-gray-100,
+body.dark .border-gray-200,
+body.dark .border-slate-200,
+body.dark .ring-slate-200 {
+  border-color: #334155;
+}
+
+body.dark input,
+body.dark select {
+  color: #f1f5f9;
+  background-color: #1e293b;
+}

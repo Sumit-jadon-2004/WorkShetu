@@ -1,0 +1,79 @@
+{
+  "machines": {
+    "title": "कृषि मशीनरी",
+    "heroBadge": "आपके पास भरोसेमंद कृषि उपकरण",
+    "heroTitle": "सही मशीन के साथ अपनी खेती को आसान बनाएं।",
+    "heroDescription": "स्थानीय मशीन मालिकों से ट्रैक्टर, कल्टीवेटर, रोटावेटर और हार्वेस्टर खोजें।",
+
+    "categories": {
+      "tractor": "ट्रैक्टर",
+      "cultivator": "कल्टीवेटर",
+      "rotavator": "रोटावेटर",
+      "harrow": "हैरो",
+      "harvester": "हार्वेस्टर"
+    },
+
+    "units": {
+      "bigha": "बीघा",
+      "acre": "एकड़",
+      "hectare": "हेक्टेयर",
+      "hour": "घंटा",
+      "day": "दिन",
+      "trip": "ट्रिप"
+    }
+  },
+
+  "machineDetails": {
+    "communityFeedback": "किसानों की राय",
+    "reviewsFromFarmers": "किसानों की समीक्षाएं",
+    "yourName": "आपका नाम",
+    "chooseRating": "रेटिंग चुनें",
+    "starRating": "{{count}} स्टार रेटिंग",
+    "shareExperience": "अपना अनुभव साझा करें",
+    "addReview": "समीक्षा जोड़ें",
+    "updateReview": "समीक्षा अपडेट करें",
+    "cancel": "रद्द करें",
+    "noReviews": "अभी कोई समीक्षा नहीं है। इस मशीन की पहली समीक्षा करें।",
+    "farmer": "किसान",
+    "editReview": "समीक्षा संपादित करें",
+    "deleteReview": "समीक्षा हटाएं",
+    "deleteReviewConfirm": "क्या आप यह समीक्षा हटाना चाहते हैं?",
+    "selectRating": "कृपया सबमिट करने से पहले स्टार रेटिंग चुनें।",
+    "reviewSaveError": "समीक्षा सेव नहीं हो सकी।",
+    "reviewDeleteError": "समीक्षा हटाई नहीं जा सकी।",
+    "farmMachine": "कृषि मशीन",
+    "agriculturalEquipment": "कृषि उपकरण",
+    "saveMachine": "मशीन सेव करें",
+    "mapTitle": "मशीन का स्थान",
+    "groupBookingLower": "ग्रुप",
+    "fastBookingLower": "फास्ट",
+    "requestReceived": "अनुरोध प्राप्त हुआ",
+    "bookMachine": "{{title}} बुक करें",
+    "closeBooking": "बुकिंग फॉर्म बंद करें",
+    "bookingReady": "आपका बुकिंग अनुरोध तैयार है।",
+    "ownerCanReview": "मालिक आपके {{type}} बुकिंग विवरण की समीक्षा कर सकता है।",
+    "done": "हो गया",
+    "farmLocation": "खेत का स्थान",
+    "landArea": "भूमि का क्षेत्रफल",
+    "areaUnit": "क्षेत्र की इकाई",
+    "workType": "काम का प्रकार",
+    "workTypePlaceholder": "उदाहरण: जुताई या कटाई",
+    "requiredDate": "आवश्यक तारीख",
+    "submitBooking": "बुकिंग अनुरोध भेजें"
+  },
+  "navbar": {
+    "home": "होम",
+    "machinery": "कृषि मशीनरी",
+    "services": "सेवाएं",
+    "bookings": "मेरी बुकिंग",
+    "saved": "सेव की गई",
+    "profile": "प्रोफाइल",
+    "search": "खोजें",
+    "searchPlaceholder": "मशीन या सेवाएं खोजें...",
+    "language": "भाषा",
+    "tagline": "स्मार्ट खेती",
+    "listMachine": "अपनी मशीन लिस्ट करें",
+    "openMenu": "मेन्यू खोलें",
+    "closeMenu": "मेन्यू बंद करें"
+  }
+}

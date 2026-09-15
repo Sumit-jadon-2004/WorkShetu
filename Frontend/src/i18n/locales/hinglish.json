@@ -1,0 +1,81 @@
+{
+  "machines": {
+    "title": "Farm Machinery",
+    "heroBadge": "Aapke paas trusted farming equipment",
+    "heroTitle": "Sahi machine ke saath apni farming ko easy banayein.",
+    "heroDescription": "Local machine owners se tractor, cultivator, rotavator aur harvester find karein.",
+
+    "categories": {
+      "tractor": "Tractor",
+      "cultivator": "Cultivator",
+      "rotavator": "Rotavator",
+      "harrow": "Harrow",
+      "harvester": "Harvester"
+    },
+
+    "units": {
+      "bigha": "Bigha",
+      "acre": "Acre",
+      "hectare": "Hectare",
+      "hour": "Hour",
+      "day": "Day",
+      "trip": "Trip"
+    }
+  },
+
+  "machineDetails": {
+    "communityFeedback": "Kisano ka feedback",
+    "reviewsFromFarmers": "Farmers ke reviews",
+    "yourName": "Aapka naam",
+    "chooseRating": "Rating choose karein",
+    "starRating": "{{count}} star rating",
+    "shareExperience": "Apna experience share karein",
+    "addReview": "Review add karein",
+    "updateReview": "Review update karein",
+    "cancel": "Cancel",
+    "noReviews": "Abhi koi review nahi hai. Is machine ka first review karein.",
+    "farmer": "Farmer",
+    "editReview": "Review edit karein",
+    "deleteReview": "Review delete karein",
+    "deleteReviewConfirm": "Kya aap ye review delete karna chahte hain?",
+    "selectRating": "Submit karne se pehle star rating choose karein.",
+    "reviewSaveError": "Review save nahi ho saka.",
+    "reviewDeleteError": "Review delete nahi ho saka.",
+    "farmMachine": "Farm machine",
+    "agriculturalEquipment": "Agricultural equipment",
+    "saveMachine": "Machine save karein",
+    "mapTitle": "Machine ka location map",
+    "groupBookingLower": "group",
+    "fastBookingLower": "fast",
+    "requestReceived": "Request receive ho gayi",
+    "bookMachine": "{{title}} book karein",
+    "closeBooking": "Booking form close karein",
+    "bookingReady": "Aapki booking request ready hai.",
+    "ownerCanReview": "Owner aapki {{type}} booking details check kar sakta hai.",
+    "done": "Done",
+    "farmLocation": "Farm location",
+    "landArea": "Land area",
+    "areaUnit": "Area unit",
+    "workType": "Work type",
+    "workTypePlaceholder": "Example: ploughing ya harvesting",
+    "requiredDate": "Required date",
+    "submitBooking": "Booking request submit karein"
+  },
+  
+  "navbar": {
+    "home": "Home",
+    "machinery": "Farm Machinery",
+    "services": "Services",
+    "bookings": "Meri Bookings",
+    "saved": "Saved",
+    "profile": "Profile",
+    "search": "Search",
+    "searchPlaceholder": "Machine ya services search karein...",
+    "language": "Language",
+    "tagline": "Smart Farming",
+    "listMachine": "Apni machine list karein",
+    "openMenu": "Menu open karein",
+    "closeMenu": "Menu close karein"
+  }
+
+}
