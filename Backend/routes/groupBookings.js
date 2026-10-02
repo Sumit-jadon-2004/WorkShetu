@@ -323,6 +323,29 @@ router.get("/owner/requests", [...requireOwner, requireUser], async (req, res) =
   return res.json({ groups: safeGroups, bookings: safeBookings });
 });
 
+router.get("/owner/completed", [...requireOwner, requireUser], async (req, res) => {
+  const expiryCutoff = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+  const legacyCompletedFilter = { owner: req.customerId, status: "Completed", completedAt: null };
+
+  await Promise.all([
+    GroupBooking.updateMany(legacyCompletedFilter, [{ $set: { completedAt: "$updatedAt" } }], { updatePipeline: true, timestamps: false }),
+    Booking.updateMany({ ...legacyCompletedFilter, bookingType: "Single" }, [{ $set: { completedAt: "$updatedAt" } }], { updatePipeline: true, timestamps: false })
+  ]);
+
+  const [groups, bookings] = await Promise.all([
+    GroupBooking.find({ owner: req.customerId, status: "Completed", completedAt: { $gt: expiryCutoff } })
+      .sort({ completedAt: -1 })
+      .populate("members.user", "fullName")
+      .populate("listing", "title category image"),
+    Booking.find({ owner: req.customerId, requestType: "Machine", bookingType: "Single", status: "Completed", completedAt: { $gt: expiryCutoff } })
+      .sort({ completedAt: -1 })
+      .populate("itemId", "title category image")
+      .populate("customer", "fullName")
+  ]);
+
+  return res.json({ groups, bookings });
+});
+
 router.get("/:id", isLoggedIn, async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid group booking ID." });
   const group = await GroupBooking.findById(req.params.id).populate("members.user", "fullName phone").populate("listing", "title price unit");
@@ -343,6 +366,7 @@ async function ownerAction(req, res, status) {
     if (!group.completionOtp || !isValidOtp(providedOtp, group.completionOtp)) return res.status(400).json({ message: "Invalid completion OTP." });
     if (group.completionOtpExpiresAt < new Date()) return res.status(400).json({ message: "Completion OTP has expired." });
     group.otpVerified = true;
+    group.completedAt = new Date();
   }
   group.status = status;
   if (status === "Accepted") {
@@ -351,7 +375,7 @@ async function ownerAction(req, res, status) {
     group.otpVerified = false;
   }
   await group.save();
-  await Booking.updateMany({ groupBookingId: group._id }, { $set: { status: status === "Accepted" ? "Accepted" : status === "Completed" ? "Completed" : "Rejected" } });
+  await Booking.updateMany({ groupBookingId: group._id }, { $set: { status: status === "Accepted" ? "Accepted" : status === "Completed" ? "Completed" : "Rejected", ...(status === "Completed" ? { completedAt: group.completedAt } : {}) } });
   return res.json(group);
 }
 
@@ -372,6 +396,7 @@ async function singleOwnerAction(req, res, status) {
     if (!booking.completionOtp || !isValidOtp(providedOtp, booking.completionOtp)) return res.status(400).json({ message: "Invalid completion OTP." });
     if (booking.completionOtpExpiresAt < new Date()) return res.status(400).json({ message: "Completion OTP has expired." });
     booking.otpVerified = true;
+    booking.completedAt = new Date();
   }
   if (status === "Accepted") {
     booking.completionOtp = createCompletionOtp();

@@ -211,6 +211,11 @@ totalPrice: {
         default: "Pending"
     },
 
+    completedAt: {
+        type: Date,
+        default: null
+    },
+
     completionOtp: {
         type: String,
         select: false
@@ -229,5 +234,7 @@ totalPrice: {
 }, {
     timestamps: true
 });
+
+bookingSchema.index({ completedAt: 1 }, { expireAfterSeconds: 15 * 24 * 60 * 60, sparse: true });
 
 module.exports = mongoose.model("Booking", bookingSchema);

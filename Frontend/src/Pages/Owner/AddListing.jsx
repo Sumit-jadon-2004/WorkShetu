@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { ImagePlus, LocateFixed, Upload, X } from "lucide-react";
 import Navbar from "../UI/Navbar.jsx";
+import { useTranslation } from "react-i18next";
 
 const categories = ["Tractor", "Cultivator", "Rotavator", "Harrow", "Harvester"];
 const units = ["Bigha", "Acre", "Hectare", "Hour", "Day", "Trip"];
 const fuelTypes = ["Diesel", "Petrol", "Electric", "CNG", "Hybrid"];
 
 function AddListing() {
+	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const [form, setForm] = useState({
 		title: "",
@@ -30,7 +32,7 @@ function AddListing() {
 	const [success, setSuccess] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [locationStatus, setLocationStatus] = useState("detecting");
-	const [locationMessage, setLocationMessage] = useState("Detecting your location...");
+	const [locationMessage, setLocationMessage] = useState(t("driver.locationFinding", "Finding your current location..."));
 
 	const updateField = (event) => {
 		const { name, value } = event.target;
@@ -41,11 +43,11 @@ function AddListing() {
 		const file = event.target.files?.[0];
 		if (!file) return;
 		if (!file.type.startsWith("image/")) {
-			setError("Please select a valid image file.");
+			setError(t("driver.invalidImage", "Please select a valid image file."));
 			return;
 		}
 		if (file.size > 5 * 1024 * 1024) {
-			setError("Image size must be less than 5 MB.");
+			setError(t("driver.imageTooLarge", "Image size must be less than 5 MB."));
 			return;
 		}
 		setError("");
@@ -60,12 +62,12 @@ function AddListing() {
 	const detectLocation = () => {
 		if (!navigator.geolocation) {
 			setLocationStatus("failed");
-			setLocationMessage("Location is unavailable. Enter it manually.");
+			setLocationMessage(t("driver.locationDenied", "Location is unavailable. Enter it manually."));
 			return;
 		}
 
 		setLocationStatus("detecting");
-		setLocationMessage("Detecting your location...");
+		setLocationMessage(t("driver.locationFinding", "Finding your current location..."));
 		navigator.geolocation.getCurrentPosition(
 			async ({ coords }) => {
 				const { latitude, longitude } = coords;
@@ -86,15 +88,15 @@ function AddListing() {
 					].filter(Boolean).join(", ").slice(0, 200);
 					setForm((current) => ({ ...current, location }));
 					setLocationStatus("success");
-					setLocationMessage(location ? `Location detected: ${location}` : "Location coordinates detected.");
+					setLocationMessage(location ? t("driver.locationDetected", "Location detected: {{location}}", { location }) : t("driver.locationManual", "Coordinates found; enter the location name manually."));
 				} catch {
 					setLocationStatus("success");
-					setLocationMessage("Coordinates detected. Enter the location name manually.");
+					setLocationMessage(t("driver.locationManual", "Coordinates found; enter the location name manually."));
 				}
 			},
 			() => {
 				setLocationStatus("failed");
-				setLocationMessage("Location permission denied. Enter it manually.");
+				setLocationMessage(t("driver.locationDenied", "Location permission denied. Enter it manually."));
 			},
 			{ enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
 		);
@@ -110,7 +112,7 @@ function AddListing() {
 		setSuccess("");
 
 		if (!image) {
-			setError("Please upload a machine image.");
+			setError(t("driver.uploadMachineImage", "Please upload a machine image."));
 			return;
 		}
 
@@ -121,10 +123,10 @@ function AddListing() {
 		try {
 			setLoading(true);
 			const response = await axios.post("/api/machine", data, { withCredentials: true });
-			setSuccess(response.data.message);
+			setSuccess(t("driver.listingCreated", "Machine listing added successfully."));
 			setTimeout(() => navigate("/machine"), 900);
 		} catch (requestError) {
-			setError(requestError.response?.data?.message || "Machine listing could not be added.");
+			setError(requestError.response?.data?.message || t("driver.createListingError", "Machine listing could not be added."));
 		} finally {
 			setLoading(false);
 		}
@@ -137,35 +139,35 @@ function AddListing() {
 			<Navbar />
 			<div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
 				<div className="mb-8">
-					<p className="text-xs font-black uppercase tracking-[0.18em] text-green-700 dark:text-lime-300">Driver workspace</p>
-					<h1 className="mt-2 text-3xl font-black text-slate-900 dark:text-white">Add machine listing</h1>
-					<p className="mt-2 text-slate-500 dark:text-slate-400">Publish your equipment so farmers can discover and book it.</p>
+					<p className="text-xs font-black uppercase tracking-[0.18em] text-green-700 dark:text-lime-300">{t("driver.workspace", "Driver workspace")}</p>
+					<h1 className="mt-2 text-3xl font-black text-slate-900 dark:text-white">{t("driver.addMachine", "Add machine listing")}</h1>
+					<p className="mt-2 text-slate-500 dark:text-slate-400">{t("driver.addListingSubtitle", "Publish your equipment so farmers can discover and book it.")}</p>
 				</div>
 
 				{error && <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
 				{success && <div className="mb-5 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">{success}</div>}
 
 				<form onSubmit={submit} className="space-y-5 rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-900 sm:p-8">
-					<label className="block text-sm font-bold">Listing title<input name="title" required minLength="3" value={form.title} onChange={updateField} placeholder="e.g. John Deere Tractor" className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" /></label>
+					<label className="block text-sm font-bold">{t("driver.title", "Title")}<input name="title" required minLength="3" value={form.title} onChange={updateField} placeholder={t("driver.listingTitlePlaceholder", "e.g. John Deere Tractor")} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" /></label>
 
 					<div className="grid gap-5 sm:grid-cols-2">
-						<label className="text-sm font-bold">Category<select name="category" value={form.category} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-800">{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
-						<label className="text-sm font-bold">Price<input name="price" required type="number" min="1" value={form.price} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" /></label>
+						<label className="text-sm font-bold">{t("driver.category", "Category")}<select name="category" value={form.category} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-800">{categories.map((category) => <option key={category} value={category}>{t(`machines.categories.${category.toLowerCase()}`, category)}</option>)}</select></label>
+						<label className="text-sm font-bold">{t("driver.price", "Price")}<input name="price" required type="number" min="1" value={form.price} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" /></label>
 					</div>
 
 					<div className="grid gap-5 sm:grid-cols-2">
-						<label className="text-sm font-bold">Pricing unit<select name="unit" value={form.unit} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-800">{units.map((unit) => <option key={unit}>{unit}</option>)}</select></label>
-						<label className="text-sm font-bold">Manufacturing year<input name="year" required type="number" min="1980" max={new Date().getFullYear() + 1} value={form.year} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" /></label>
+						<label className="text-sm font-bold">{t("driver.unit", "Pricing unit")}<select name="unit" value={form.unit} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-800">{units.map((unit) => <option key={unit} value={unit}>{t(`machines.units.${unit.toLowerCase()}`, unit)}</option>)}</select></label>
+						<label className="text-sm font-bold">{t("driver.manufacturingYear", "Manufacturing year")}<input name="year" required type="number" min="1980" max={new Date().getFullYear() + 1} value={form.year} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" /></label>
 					</div>
 
-					{needsVehicleDetails && <div className="grid gap-5 sm:grid-cols-2"><label className="text-sm font-bold">Vehicle number<input name="vehicleNumber" required value={form.vehicleNumber} onChange={updateField} placeholder="UP80AB1234" className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 uppercase dark:border-slate-700 dark:bg-slate-800" /></label><label className="text-sm font-bold">Power (HP)<input name="power" required type="number" min="1" value={form.power} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" /></label></div>}
+					{needsVehicleDetails && <div className="grid gap-5 sm:grid-cols-2"><label className="text-sm font-bold">{t("driver.vehicleNumber", "Vehicle number")}<input name="vehicleNumber" required value={form.vehicleNumber} onChange={updateField} placeholder="UP80AB1234" className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 uppercase dark:border-slate-700 dark:bg-slate-800" /></label><label className="text-sm font-bold">{t("driver.power", "Power (HP)")}<input name="power" required type="number" min="1" value={form.power} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" /></label></div>}
 
-					{needsVehicleDetails && <label className="block text-sm font-bold">Fuel type<select name="fuelType" required value={form.fuelType} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"><option value="">Select fuel type</option>{fuelTypes.map((fuelType) => <option key={fuelType} value={fuelType}>{fuelType}</option>)}</select></label>}
+					{needsVehicleDetails && <label className="block text-sm font-bold">{t("driver.fuelType", "Fuel type")}<select name="fuelType" required value={form.fuelType} onChange={updateField} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"><option value="">{t("driver.selectFuel", "Select fuel type")}</option>{fuelTypes.map((fuelType) => <option key={fuelType} value={fuelType}>{fuelType}</option>)}</select></label>}
 
 					<div className="rounded-2xl border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
 						<div className="flex items-start justify-between gap-3">
-							<label className="block flex-1 text-sm font-bold">Location<input name="location" required value={form.location} onChange={updateField} placeholder="Village, District, State" className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" /></label>
-							<button type="button" onClick={detectLocation} disabled={locationStatus === "detecting"} className="mt-7 inline-flex h-12 shrink-0 items-center gap-2 rounded-xl bg-green-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-green-800 disabled:cursor-wait disabled:opacity-70"><LocateFixed size={17} className={locationStatus === "detecting" ? "animate-pulse" : ""} />{locationStatus === "detecting" ? "Detecting..." : "Use current location"}</button>
+							<label className="block flex-1 text-sm font-bold">{t("driver.location", "Location")}<input name="location" required value={form.location} onChange={updateField} placeholder={t("driver.locationPlaceholder", "Village, District, State")} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" /></label>
+							<button type="button" onClick={detectLocation} disabled={locationStatus === "detecting"} className="mt-7 inline-flex h-12 shrink-0 items-center gap-2 rounded-xl bg-green-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-green-800 disabled:cursor-wait disabled:opacity-70"><LocateFixed size={17} className={locationStatus === "detecting" ? "animate-pulse" : ""} />{locationStatus === "detecting" ? t("driver.findingLocation", "Finding...") : t("driver.useCurrentLocation", "Use current location")}</button>
 						</div>
 						<p className={`mt-2 text-xs font-semibold ${locationStatus === "failed" ? "text-amber-700" : "text-green-700"}`}>{locationMessage}</p>
 					</div>
@@ -176,29 +178,29 @@ function AddListing() {
 
 					<div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60">
 						<div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
-							<div className="flex items-center gap-2 text-sm font-black text-slate-800 dark:text-slate-100"><ImagePlus size={18} className="text-green-700" />Machine image</div>
-							<span className="text-xs font-semibold text-slate-400">Required</span>
+							<div className="flex items-center gap-2 text-sm font-black text-slate-800 dark:text-slate-100"><ImagePlus size={18} className="text-green-700" />{t("driver.listingPhoto", "Machine image")}</div>
+							<span className="text-xs font-semibold text-slate-400">{t("driver.required", "Required")}</span>
 						</div>
 						{imagePreview ? (
 							<div className="relative">
 								<img src={imagePreview} alt="Machine preview" className="h-56 w-full object-cover" />
 								<div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/70 to-transparent p-4 pt-10">
-									<label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-xs font-black text-slate-800"><Upload size={15} />Change<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} className="hidden" /></label>
-									<button type="button" onClick={() => { setImage(null); setImagePreview(""); }} className="inline-flex items-center gap-2 rounded-lg bg-red-600/90 px-3 py-2 text-xs font-black text-white"><X size={15} />Remove</button>
+									<label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-xs font-black text-slate-800"><Upload size={15} />{t("driver.changePhoto", "Change")}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} className="hidden" /></label>
+									<button type="button" onClick={() => { setImage(null); setImagePreview(""); }} className="inline-flex items-center gap-2 rounded-lg bg-red-600/90 px-3 py-2 text-xs font-black text-white"><X size={15} />{t("driver.removePhoto", "Remove")}</button>
 								</div>
 							</div>
 						) : (
 							<label className="flex cursor-pointer flex-col items-center justify-center px-5 py-10 text-center transition hover:bg-green-50 dark:hover:bg-green-950/20">
 								<div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300"><Upload size={22} /></div>
-								<span className="text-sm font-black text-slate-800 dark:text-slate-100">Upload machine photo</span>
-								<span className="mt-1 text-xs text-slate-500">JPG, PNG or WEBP, maximum 5 MB</span>
+								<span className="text-sm font-black text-slate-800 dark:text-slate-100">{t("driver.uploadMachinePhoto", "Upload machine photo")}</span>
+								<span className="mt-1 text-xs text-slate-500">{t("driver.photoHelp", "JPG, PNG or WEBP, maximum 5 MB")}</span>
 								<input required type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageChange} className="hidden" />
 							</label>
 						)}
 					</div>
-					<label className="block text-sm font-bold">Description<textarea name="description" required minLength="10" value={form.description} onChange={updateField} rows="4" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
+					<label className="block text-sm font-bold">{t("driver.description", "Description")}<textarea name="description" required minLength="10" value={form.description} onChange={updateField} rows="4" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
 
-					<button type="submit" disabled={loading} className="h-12 w-full rounded-xl bg-green-700 font-black text-white disabled:opacity-50">{loading ? "Publishing..." : "Publish machine listing"}</button>
+					<button type="submit" disabled={loading} className="h-12 w-full rounded-xl bg-green-700 font-black text-white disabled:opacity-50">{loading ? t("driver.publishing", "Publishing...") : t("driver.publishListing", "Publish machine listing")}</button>
 				</form>
 			</div>
 		</main>

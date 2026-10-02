@@ -115,12 +115,10 @@ function Navbar() {
   // --------------------------------------------------
 
   const navItems = user?.role === "Driver"
-    ? [
-        { to: "/Drivers", label: "Dashboard", icon: Home },
-        { to: "/driver/listings/new", label: "Add machine", icon: Plus },
-        { to: "/machine", label: "Machinery", icon: Tractor },
-        { to: "/bookings", label: "My bookings", icon: ClipboardList },
-        { to: "/chat", label: "Chats", icon: MessageCircle },
+      ? [
+        { to: "/Drivers", label: t("driver.dashboard", "Dashboard"), icon: Home },
+        { to: "/machine", label: t("navbar.machinery", "Machinery"), icon: Tractor },
+        { to: "/chat", label: t("driver.chat", "Chats"), icon: MessageCircle },
       ]
     : [
         {
@@ -145,7 +143,7 @@ function Navbar() {
         },
         {
           to: "/chat",
-          label: "Chat",
+          label: t("driver.chat", "Chat"),
           icon: MessageCircle,
         },
       ];

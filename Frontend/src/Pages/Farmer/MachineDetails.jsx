@@ -379,16 +379,6 @@ function MachineDetails() {
 
     setError("");
 
-    if (!reviewForm.rating) {
-      setError(
-        t(
-          "machineDetails.selectRating",
-          "Please select a star rating before submitting."
-        )
-      );
-      return;
-    }
-
     try {
       const endpoint = editingReviewId
         ? `/api/reviews/${editingReviewId}`
@@ -399,7 +389,10 @@ function MachineDetails() {
       await axios({
         method,
         url: endpoint,
-        data: reviewForm,
+        data: {
+          ...(reviewForm.rating ? { rating: reviewForm.rating } : {}),
+          text: reviewForm.text,
+        },
       });
 
       setReviewForm({
@@ -1305,27 +1298,9 @@ function MachineDetails() {
             className="mt-6 rounded-2xl bg-slate-50 p-4 sm:p-5"
           >
 
-            <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
-
-              <input
-                required
-                value={reviewForm.reviewerName}
-                onChange={(event) =>
-                  setReviewForm({
-                    ...reviewForm,
-                    reviewerName:
-                      event.target.value,
-                  })
-                }
-                placeholder={t(
-                  "machineDetails.yourName",
-                  "Your name"
-                )}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-green-600"
-              />
-
+            <div>
               <div
-                className="flex h-11 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3"
+                className="flex h-11 w-fit items-center gap-1 rounded-xl border border-slate-200 bg-white px-3"
                 aria-label={t(
                   "machineDetails.chooseRating",
                   "Choose rating"

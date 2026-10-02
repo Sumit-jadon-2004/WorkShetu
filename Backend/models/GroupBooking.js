@@ -40,6 +40,7 @@ const groupBookingSchema = new mongoose.Schema(
       enum: ["Forming", "Ready", "RequestSent", "Accepted", "Rejected", "Completed", "Cancelled"],
       default: "Forming"
     },
+    completedAt: { type: Date, default: null },
     completionOtp: { type: String, select: false },
     completionOtpExpiresAt: { type: Date, select: false },
     otpVerified: { type: Boolean, default: false },
@@ -51,5 +52,6 @@ const groupBookingSchema = new mongoose.Schema(
 groupBookingSchema.index({ listing: 1, requestType: 1, status: 1 });
 
 groupBookingSchema.index({ owner: 1, status: 1 });
+groupBookingSchema.index({ completedAt: 1 }, { expireAfterSeconds: 15 * 24 * 60 * 60, sparse: true });
 
 module.exports = mongoose.model("GroupBooking", groupBookingSchema);

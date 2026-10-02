@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../UI/Navbar.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useTranslation } from "react-i18next";
 
 function Registration() {
+  const { t } = useTranslation();
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -20,7 +22,7 @@ function Registration() {
 
   const [locationStatus, setLocationStatus] = useState("detecting");
   const [locationMessage, setLocationMessage] = useState(
-    "Detecting your location..."
+    t("auth.locationFinding", "Finding your location...")
   );
 
   const [error, setError] = useState("");
@@ -35,7 +37,7 @@ function Registration() {
     if (!navigator.geolocation) {
       setLocationStatus("failed");
       setLocationMessage(
-        "Location is unavailable. You can enter it manually."
+        t("auth.locationUnavailable", "Location is unavailable. You can enter it manually.")
       );
       return;
     }
@@ -91,12 +93,12 @@ function Registration() {
 
           setLocationStatus("success");
           setLocationMessage(
-            `Location detected${location ? `\n${location}` : ""}`
+            `${t("auth.locationFound", "Location detected")}${location ? `\n${location}` : ""}`
           );
         } catch {
           setLocationStatus("failed");
           setLocationMessage(
-            "Coordinates detected, but address lookup failed. You can enter your location manually."
+            t("auth.coordinatesAddressError", "Coordinates found, but address lookup failed. You can enter your location manually.")
           );
         }
       },
@@ -105,11 +107,11 @@ function Registration() {
 
         if (positionError.code === positionError.PERMISSION_DENIED) {
           setLocationMessage(
-            "Location permission denied. You can enter your location manually."
+            t("auth.locationDenied", "Location permission denied. You can enter your location manually.")
           );
         } else {
           setLocationMessage(
-            "Location could not be detected. You can enter your location manually."
+            t("auth.locationNotDetected", "Location could not be detected. You can enter your location manually.")
           );
         }
       },
@@ -144,7 +146,7 @@ function Registration() {
     setError("");
 
     if (form.password !== form.confirmPassword) {
-      setError("Passwords must match.");
+      setError(t("auth.passwordsMatch", "Passwords must match."));
       return;
     }
 
@@ -167,7 +169,7 @@ function Registration() {
       setError(
         requestError.response?.data?.message ||
           requestError.message ||
-          "Registration could not be completed."
+          t("auth.registerError", "Registration could not be completed.")
       );
     } finally {
       setLoading(false);
@@ -183,7 +185,7 @@ function Registration() {
           onSubmit={submit}
           className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-900 sm:p-8"
         >
-          <h1 className="text-3xl font-black">Create account</h1>
+          <h1 className="text-3xl font-black">{t("auth.createAccount", "Create account")}</h1>
 
           <p
             className={`mt-3 whitespace-pre-line rounded-xl p-3 text-sm font-semibold ${
@@ -202,7 +204,7 @@ function Registration() {
           )}
 
           <label className="mt-6 block text-sm font-bold">
-            Full name
+            {t("auth.fullName", "Full name")}
 
             <input
               name="fullName"
@@ -215,7 +217,7 @@ function Registration() {
           </label>
 
           <label className="mt-4 block text-sm font-bold">
-            Phone
+            {t("auth.phone", "Phone")}
 
             <input
               name="phone"
@@ -229,7 +231,7 @@ function Registration() {
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-bold">
-              Password
+              {t("auth.password", "Password")}
 
               <div className="mt-2 flex rounded-xl border border-slate-200 dark:border-slate-700">
                 <input
@@ -247,13 +249,13 @@ function Registration() {
                   onClick={() => setShowPassword((value) => !value)}
                   className="px-2 text-xs"
                 >
-                  {showPassword ? "Hide" : "Show"}
+                  {showPassword ? t("auth.hide", "Hide") : t("auth.show", "Show")}
                 </button>
               </div>
             </label>
 
             <label className="text-sm font-bold">
-              Confirm password
+              {t("auth.confirmPassword", "Confirm password")}
 
               <input
                 name="confirmPassword"
@@ -267,13 +269,13 @@ function Registration() {
           </div>
 
           <label className="mt-4 block text-sm font-bold">
-            Location
+            {t("auth.location", "Location")}
 
             <input
               name="location"
               value={form.location}
               onChange={updateField}
-              placeholder="Village, District, State"
+              placeholder={t("auth.locationPlaceholder", "Village, District, State")}
               className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
             />
           </label>
@@ -283,16 +285,16 @@ function Registration() {
             disabled={loading}
             className="mt-6 h-12 w-full rounded-xl bg-green-700 font-black text-white disabled:opacity-50"
           >
-            {loading ? "Creating account..." : "Create account"}
+            {loading ? t("auth.creatingAccount", "Creating account...") : t("auth.createAccount", "Create account")}
           </button>
 
           <p className="mt-5 text-center text-sm text-slate-500">
-            Already registered?{" "}
+            {t("auth.alreadyRegistered", "Already registered?")}{" "}
             <Link
               className="font-bold text-green-700"
               to="/login"
             >
-              Login
+              {t("auth.loginTitle", "Login")}
             </Link>
           </p>
         </form>

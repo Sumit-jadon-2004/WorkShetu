@@ -23,6 +23,7 @@ import {
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const languages = {
   hi: {
@@ -204,6 +205,7 @@ const languages = {
 };
 
 function App() {
+  const { i18n } = useTranslation();
   const [comingSoon, setComingSoon] = useState(false);
   const [language, setLanguage] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -229,6 +231,7 @@ function App() {
 
   const selectLanguage = (lang) => {
     localStorage.setItem("workshetu-language", lang);
+    i18n.changeLanguage(lang);
     setLanguage(lang);
     setLanguageOpen(false);
   };

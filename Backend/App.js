@@ -14,6 +14,10 @@ const Machine =
 const Review =
     require("./models/Review.js");
 
+const Booking = require("./models/BookingMachine.js");
+const GroupBooking = require("./models/GroupBooking.js");
+const { cloudinary } = require("./Cloudinary.js");
+
 const groupBookings =
     require("./routes/groupBookings.js");
 
@@ -361,6 +365,15 @@ connectDatabase();
 // MACHINE DETAILS
 // ======================================================
 
+app.get("/api/machine/mine", isLoggedIn, isDriver, async (req, res) => {
+    try {
+        const machines = await Machine.find({ owner: req.user._id }).sort({ createdAt: -1 });
+        return res.json(machines);
+    } catch (error) {
+        return res.status(500).json({ message: "Unable to load your listings." });
+    }
+});
+
 app.get(
     "/api/machine/:id",
     async (req, res) => {
@@ -476,7 +489,7 @@ app.post(
                         req.user._id,
 
                     reviewerName:
-                        req.body.reviewerName,
+                        req.user.fullName,
 
                     rating:
                         req.body.rating,
@@ -525,7 +538,7 @@ app.put(
                     {
 
                         reviewerName:
-                            req.body.reviewerName,
+                            req.user.fullName,
 
                         rating:
                             req.body.rating,
@@ -701,6 +714,71 @@ app.post(
         }
     }
 );
+
+
+app.put("/api/machine/:id", isLoggedIn, isDriver, upload.single("image"), async (req, res) => {
+    try {
+        const machine = await Machine.findOne({ _id: req.params.id, owner: req.user._id });
+        if (!machine) return res.status(404).json({ message: "Listing not found." });
+
+        const fields = {
+            title: String(req.body.title || "").trim(),
+            category: req.body.category,
+            vehicleNumber: String(req.body.vehicleNumber || "").trim() || undefined,
+            price: Number(req.body.price),
+            unit: req.body.unit,
+            power: req.body.power ? Number(req.body.power) : undefined,
+            fuelType: req.body.fuelType || undefined,
+            year: Number(req.body.year),
+            location: String(req.body.location || "").trim(),
+            latitude: Number(req.body.latitude),
+            longitude: Number(req.body.longitude),
+            description: String(req.body.description || "").trim(),
+        };
+
+        const oldImageFilename = machine.image?.filename;
+        machine.set(fields);
+        if (req.file) {
+            machine.image = { url: req.file.path, filename: req.file.filename };
+        }
+        await machine.save();
+
+        if (req.file && oldImageFilename) {
+            cloudinary.uploader.destroy(oldImageFilename).catch((imageError) => {
+                console.error("Could not remove replaced listing image:", imageError.message);
+            });
+        }
+        return res.json({ success: true, machine });
+    } catch (error) {
+        return res.status(400).json({ message: error.message || "Listing could not be updated." });
+    }
+});
+
+app.delete("/api/machine/:id", isLoggedIn, isDriver, async (req, res) => {
+    try {
+        const machine = await Machine.findOne({ _id: req.params.id, owner: req.user._id });
+        if (!machine) return res.status(404).json({ message: "Listing not found." });
+
+        const [activeBooking, activeGroup] = await Promise.all([
+            Booking.exists({ itemId: machine._id, status: { $in: ["Pending", "Accepted"] } }),
+            GroupBooking.exists({ listing: machine._id, status: { $in: ["Forming", "Ready", "RequestSent", "Accepted"] } }),
+        ]);
+        if (activeBooking || activeGroup) {
+            return res.status(409).json({ message: "This listing has active booking requests and cannot be deleted yet." });
+        }
+
+        await machine.deleteOne();
+        await Review.deleteMany({ machine: machine._id });
+        if (machine.image?.filename) {
+            cloudinary.uploader.destroy(machine.image.filename).catch((imageError) => {
+                console.error("Could not remove deleted listing image:", imageError.message);
+            });
+        }
+        return res.status(204).send();
+    } catch (error) {
+        return res.status(400).json({ message: "Listing could not be deleted." });
+    }
+});
 
 
 // ======================================================

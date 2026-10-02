@@ -30,6 +30,12 @@ import LabourSPage
 import DriverDashboard
     from "./Pages/Driver/DriverDashboard.jsx";
 
+import CompletedWork
+    from "./Pages/Driver/CompletedWork.jsx";
+
+import ManageListings
+    from "./Pages/Driver/ManageListings.jsx";
+
 import DriverApply
     from "./Pages/Driver/DriverApply.jsx";
 
@@ -227,6 +233,24 @@ function App() {
 
                                     <DriverDashboard />
 
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        <Route
+                            path="/driver/completed"
+                            element={
+                                <ProtectedRoute roles={["Driver", "Admin"]}>
+                                    <CompletedWork />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        <Route
+                            path="/driver/listings"
+                            element={
+                                <ProtectedRoute roles={["Driver"]}>
+                                    <ManageListings />
                                 </ProtectedRoute>
                             }
                         />
