@@ -1,5 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 const Booking = require("../models/BookingMachine.js");
 const GroupBooking = require("../models/GroupBooking.js");
 const Machine = require("../models/ListingMachin.js");
@@ -14,6 +15,14 @@ const {
 const { isLoggedIn, isFarmer } = require("../middleware/auth.js");
 
 const router = express.Router();
+
+function createCompletionOtp() {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+function isValidOtp(value, expected) {
+  return typeof value === "string" && typeof expected === "string" && value.length === expected.length && crypto.timingSafeEqual(Buffer.from(value), Buffer.from(expected));
+}
 
 function getUserId(req) {
   return req.user?._id || req.user?.id;
@@ -30,7 +39,7 @@ function requireUser(req, res, next) {
 
 const requireFarmer = [isLoggedIn, isFarmer];
 const requireOwner = [isLoggedIn, (req, res, next) => {
-  if (["Driver", "Admin"].includes(req.user.role)) return next();
+  if (req.user.role === "Driver" || req.user.isAdmin === true) return next();
   return res.status(403).json({ success: false, message: "Only drivers or admins can manage group requests." });
 }];
 
@@ -108,6 +117,9 @@ async function createGroup(req, res) {
       ]);
       if (!machine) throw Object.assign(new Error("Machine not found."), { status: 404 });
       if (!customer) throw Object.assign(new Error("User not found."), { status: 401 });
+      if (String(machine.owner) === String(customer._id)) {
+        throw Object.assign(new Error("You cannot book your own machine."), { status: 403 });
+      }
 
       const member = memberInput(req.body, customer);
       let group = req.joinGroupId
@@ -203,9 +215,112 @@ router.get("/my", [...requireFarmer, requireUser], async (req, res) => {
   return res.json(groups);
 });
 
+router.get("/my/requests", [...requireFarmer, requireUser], async (req, res) => {
+  const [groups, bookings] = await Promise.all([
+    GroupBooking.find({ "members.user": req.customerId })
+      .select("+completionOtp +completionOtpExpiresAt")
+      .sort({ createdAt: -1 })
+      .populate("listing", "title category image location latitude longitude owner"),
+    Booking.find({ customer: req.customerId, requestType: "Machine" })
+      .select("+completionOtp +completionOtpExpiresAt")
+      .sort({ createdAt: -1 })
+      .populate("itemId", "title category image location latitude longitude owner")
+      .populate("owner", "fullName")
+  ]);
+
+  const acceptedGroupsWithoutOtp = groups.filter((group) => group.status === "Accepted" && !group.completionOtp);
+  const acceptedBookingsWithoutOtp = bookings.filter((booking) => booking.status === "Accepted" && !booking.completionOtp);
+
+  await Promise.all([
+    ...acceptedGroupsWithoutOtp.map((group) => {
+      group.completionOtp = createCompletionOtp();
+      group.completionOtpExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      return group.save();
+    }),
+    ...acceptedBookingsWithoutOtp.map((booking) => {
+      booking.completionOtp = createCompletionOtp();
+      booking.completionOtpExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      return booking.save();
+    })
+  ]);
+
+  return res.json({ groups, bookings });
+});
+
+router.put("/my/single/:id/cancel", [...requireFarmer, requireUser], async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid booking ID." });
+  const booking = await Booking.findOne({
+    _id: req.params.id,
+    customer: req.customerId,
+    requestType: "Machine",
+    bookingType: "Single",
+    status: "Pending"
+  });
+  if (!booking) return res.status(409).json({ message: "This booking can no longer be cancelled." });
+  await Booking.deleteOne({ _id: booking._id });
+  return res.json({ success: true, message: "Booking cancelled and removed successfully." });
+});
+
+router.put("/my/group/:id/cancel", [...requireFarmer, requireUser], async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid booking ID." });
+  const booking = await Booking.findOne({
+    _id: req.params.id,
+    customer: req.customerId,
+    requestType: "Machine",
+    bookingType: "Group",
+    status: "Pending"
+  });
+  if (!booking || !booking.groupBookingId) return res.status(409).json({ message: "This booking can no longer be cancelled." });
+
+  const group = await GroupBooking.findOne({ _id: booking.groupBookingId, status: { $in: ["Forming", "RequestSent", "Ready"] } });
+  if (!group) return res.status(409).json({ message: "This group booking can no longer be cancelled." });
+
+  await Booking.deleteOne({ _id: booking._id });
+  group.members = group.members.filter((member) => String(member.booking) !== String(booking._id));
+  recalculateGroup(group);
+  group.status = group.totalLandArea >= group.minimumRequiredLand ? "RequestSent" : "Forming";
+  await group.save();
+  return res.json({ success: true, message: "Group booking cancelled successfully." });
+});
+
 router.get("/owner/list", [...requireOwner, requireUser], async (req, res) => {
   const groups = await GroupBooking.find({ owner: req.customerId }).sort({ createdAt: -1 }).populate("members.user", "fullName phone").populate("listing", "title price unit");
   return res.json(groups);
+});
+
+router.get("/owner/requests", [...requireOwner, requireUser], async (req, res) => {
+  const [groups, bookings] = await Promise.all([
+    GroupBooking.find({ owner: req.customerId })
+      .sort({ createdAt: -1 })
+      .populate("members.user", "fullName phone")
+      .populate("listing", "title price unit"),
+    Booking.find({ owner: req.customerId, requestType: "Machine", bookingType: "Single" })
+      .sort({ createdAt: -1 })
+      .populate("itemId", "title category image")
+      .populate("customer", "fullName phone")
+  ]);
+
+  const safeGroups = groups.map((group) => {
+    const data = group.toObject();
+    if (data.status !== "Accepted") {
+      data.members = data.members.map((member) => {
+        if (member.user) delete member.user.phone;
+        return member;
+      });
+    }
+    return data;
+  });
+
+  const safeBookings = bookings.map((booking) => {
+    const data = booking.toObject();
+    if (data.status !== "Accepted") {
+      delete data.customerPhone;
+      if (data.customer) delete data.customer.phone;
+    }
+    return data;
+  });
+
+  return res.json({ groups: safeGroups, bookings: safeBookings });
 });
 
 router.get("/:id", isLoggedIn, async (req, res) => {
@@ -214,16 +329,27 @@ router.get("/:id", isLoggedIn, async (req, res) => {
   if (!group) return res.status(404).json({ message: "Group booking not found." });
   const isMember = group.members.some((member) => String(member.user?._id || member.user) === String(req.user._id));
   const isOwner = String(group.owner) === String(req.user._id);
-  if (!isMember && !isOwner && req.user.role !== "Admin") return res.status(403).json({ message: "You are not authorized to view this group booking." });
+  if (!isMember && !isOwner && req.user.isAdmin !== true) return res.status(403).json({ message: "You are not authorized to view this group booking." });
   return res.json(group);
 });
 
 async function ownerAction(req, res, status) {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid group booking ID." });
-  const group = await GroupBooking.findOne({ _id: req.params.id, owner: req.customerId });
+  const group = await GroupBooking.findOne({ _id: req.params.id, owner: req.customerId }).select("+completionOtp +completionOtpExpiresAt");
   if (!group) return res.status(404).json({ message: "Group booking not found." });
   if (!["RequestSent", "Ready", "Accepted"].includes(group.status) && status !== "Cancelled") return res.status(409).json({ message: "This group is not ready for that action." });
+  if (status === "Completed") {
+    const providedOtp = String(req.body.otp || "");
+    if (!group.completionOtp || !isValidOtp(providedOtp, group.completionOtp)) return res.status(400).json({ message: "Invalid completion OTP." });
+    if (group.completionOtpExpiresAt < new Date()) return res.status(400).json({ message: "Completion OTP has expired." });
+    group.otpVerified = true;
+  }
   group.status = status;
+  if (status === "Accepted") {
+    group.completionOtp = createCompletionOtp();
+    group.completionOtpExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    group.otpVerified = false;
+  }
   await group.save();
   await Booking.updateMany({ groupBookingId: group._id }, { $set: { status: status === "Accepted" ? "Accepted" : status === "Completed" ? "Completed" : "Rejected" } });
   return res.json(group);
@@ -234,6 +360,33 @@ router.put("/:id/reject", [...requireOwner, requireUser], (req, res) => ownerAct
 router.put("/:id/cancel", [...requireOwner, requireUser], (req, res) => ownerAction(req, res, "Cancelled"));
 router.put("/:id/complete", [...requireOwner, requireUser], (req, res) => ownerAction(req, res, "Completed"));
 
+async function singleOwnerAction(req, res, status) {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid booking ID." });
+  const booking = await Booking.findOne({ _id: req.params.id, owner: req.customerId, requestType: "Machine", bookingType: "Single" }).select("+completionOtp +completionOtpExpiresAt");
+  if (!booking) return res.status(404).json({ message: "Fast booking not found." });
+  if (!["Pending", "Accepted"].includes(booking.status) && status !== "Cancelled") {
+    return res.status(409).json({ message: "This booking is not ready for that action." });
+  }
+  if (status === "Completed") {
+    const providedOtp = String(req.body.otp || "");
+    if (!booking.completionOtp || !isValidOtp(providedOtp, booking.completionOtp)) return res.status(400).json({ message: "Invalid completion OTP." });
+    if (booking.completionOtpExpiresAt < new Date()) return res.status(400).json({ message: "Completion OTP has expired." });
+    booking.otpVerified = true;
+  }
+  if (status === "Accepted") {
+    booking.completionOtp = createCompletionOtp();
+    booking.completionOtpExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    booking.otpVerified = false;
+  }
+  booking.status = status;
+  await booking.save();
+  return res.json(booking);
+}
+
+router.put("/single/:id/accept", [...requireOwner, requireUser], (req, res) => singleOwnerAction(req, res, "Accepted"));
+router.put("/single/:id/reject", [...requireOwner, requireUser], (req, res) => singleOwnerAction(req, res, "Rejected"));
+router.put("/single/:id/complete", [...requireOwner, requireUser], (req, res) => singleOwnerAction(req, res, "Completed"));
+
 router.post("/single", [...requireFarmer, requireUser], async (req, res) => {
   const error = validateMachineInput(req.body);
   if (error) return res.status(400).json({ message: error });
@@ -243,6 +396,7 @@ router.post("/single", [...requireFarmer, requireUser], async (req, res) => {
   ]);
   if (!machine) return res.status(404).json({ message: "Machine not found." });
   if (!customer) return res.status(401).json({ message: "User not found." });
+  if (String(machine.owner) === String(customer._id)) return res.status(403).json({ message: "You cannot book your own machine." });
   const price = getSinglePrice(machine.price, Number(req.body.landArea));
   const booking = await createBooking({ machine, customer, body: req.body, bookingType: "Single", price });
   return res.status(201).json(booking);

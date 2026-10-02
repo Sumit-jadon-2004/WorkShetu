@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "../UI/Navbar.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import {
   CheckCircle2,
   ChevronRight,
@@ -18,12 +19,14 @@ import {
   Star,
   Trash2,
   Tractor,
+  X,
 } from "lucide-react";
 
 function MachineDetails() {
   const { t, i18n } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [machine, setMachine] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -41,6 +44,8 @@ function MachineDetails() {
   const [bookingType, setBookingType] = useState(null);
   const [bookingSubmitted, setBookingSubmitted] = useState(false);
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [bookingLocationStatus, setBookingLocationStatus] = useState("idle");
+  const [bookingLocationMessage, setBookingLocationMessage] = useState("");
 
   const [bookingForm, setBookingForm] = useState({
     customerName: "",
@@ -49,6 +54,8 @@ function MachineDetails() {
     areaUnit: "Bigha",
     workType: "",
     requiredDate: "",
+    latitude: "",
+    longitude: "",
   });
 
   // --------------------------------------------------
@@ -220,8 +227,24 @@ function MachineDetails() {
   // --------------------------------------------------
 
   const openBooking = (type) => {
+    if (!user) {
+      navigate("/login", { state: { from: `/machines/${id}` } });
+      return;
+    }
+
+    if (machine?.isOwner === true) {
+      setError(
+        t(
+          "machineDetails.cannotBookOwnListing",
+          "You cannot book your own listing."
+        )
+      );
+      return;
+    }
+
     setBookingType(type);
     setBookingSubmitted(false);
+    detectBookingLocation();
   };
 
   const closeBooking = () => {
@@ -238,8 +261,79 @@ function MachineDetails() {
     }));
   };
 
+  const detectBookingLocation = () => {
+    if (!navigator.geolocation) {
+      setBookingLocationStatus("failed");
+      setBookingLocationMessage("Location is unavailable. Enter it manually.");
+      return;
+    }
+
+    setBookingLocationStatus("detecting");
+    setBookingLocationMessage("Detecting your location...");
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        const { latitude, longitude } = coords;
+        const coordinateLabel = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        setBookingForm((form) => ({
+          ...form,
+          customerLocation: form.customerLocation || coordinateLabel,
+          latitude,
+          longitude,
+        }));
+
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+            { headers: { "Accept-Language": "en" } }
+          );
+          if (!response.ok) throw new Error("Reverse geocoding failed");
+          const address = (await response.json()).address || {};
+          const location = [
+            address.village || address.locality || address.town || address.suburb || address.city,
+            address.district || address.county,
+            address.state,
+            address.country,
+          ].filter(Boolean).join(", ").slice(0, 200);
+            setBookingForm((form) => ({
+              ...form,
+              customerLocation: location || form.customerLocation || coordinateLabel,
+              latitude,
+              longitude,
+            }));
+          setBookingLocationStatus("success");
+          setBookingLocationMessage(location ? "Location detected." : "Coordinates detected. Enter location name if needed.");
+        } catch {
+          setBookingLocationStatus("success");
+          setBookingLocationMessage("Coordinates detected. Enter location name if needed.");
+        }
+      },
+      () => {
+        setBookingLocationStatus("failed");
+        setBookingLocationMessage("Location permission denied. Enter it manually.");
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
   const submitBooking = async (event) => {
     event.preventDefault();
+
+    if (!user) {
+      setBookingType(null);
+      navigate("/login", { state: { from: `/machines/${id}` } });
+      return;
+    }
+
+    if (machine?.isOwner === true) {
+      setError(
+        t(
+          "machineDetails.cannotBookOwnListing",
+          "You cannot book your own listing."
+        )
+      );
+      return;
+    }
+
     setBookingSubmitting(true);
     setError("");
 
@@ -250,6 +344,8 @@ function MachineDetails() {
       const response = await axios.post(endpoint, {
         itemId: id,
         location: bookingForm.customerLocation,
+        latitude: bookingForm.latitude,
+        longitude: bookingForm.longitude,
         landArea: bookingForm.landArea,
         bookingDate: bookingForm.requiredDate,
         workType: bookingForm.workType,
@@ -257,6 +353,11 @@ function MachineDetails() {
       });
 
       setBookingSubmitted(true);
+      setBookingType(null);
+      localStorage.setItem("workshetu-order-notice", JSON.stringify({
+        type: bookingType === "group" ? "Group" : "Fast",
+        bookingId: response.data?._id || response.data?.group?._id,
+      }));
       return response;
     } catch (bookingError) {
       console.error(bookingError);
@@ -448,6 +549,10 @@ function MachineDetails() {
 
   const isAvailable =
     machine.availability === "Available";
+
+  const isOwner = machine.isOwner === true || (
+    user?._id && machine.owner && String(machine.owner) === String(user._id)
+  );
 
   const averageRating =
     reviews.length > 0
@@ -751,34 +856,61 @@ function MachineDetails() {
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
 
-              <button
+              {!isOwner && <button
                 type="button"
                 onClick={() => openBooking("fast")}
-                disabled={!isAvailable}
+                disabled={!isAvailable || isOwner}
                 className="flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#176b3a] px-4 text-sm font-black text-white shadow-lg shadow-green-900/20 transition hover:bg-[#125a31] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Clock3 size={18} />
 
-                {t(
-                  "machineDetails.fastBooking",
-                  "Fast Booking"
-                )}
-              </button>
+                {isOwner
+                  ? t(
+                      "machineDetails.yourOwnListing",
+                      "Your Listing"
+                    )
+                  : t(
+                      "machineDetails.fastBooking",
+                      "Fast Booking"
+                    )}
+              </button>}
 
-              <button
+              {!isOwner && <button
                 type="button"
                 onClick={() => openBooking("group")}
-                disabled={!isAvailable}
+                disabled={!isAvailable || isOwner}
                 className="flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl border border-green-200 bg-green-50 px-4 text-sm font-black text-green-800 transition hover:bg-green-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Tractor size={18} />
 
-                {t(
-                  "machineDetails.groupBooking",
-                  "Group Booking"
-                )}
-              </button>
+                {isOwner
+                  ? t(
+                      "machineDetails.yourOwnListing",
+                      "Your Listing"
+                    )
+                  : t(
+                      "machineDetails.groupBooking",
+                      "Group Booking"
+                    )}
+              </button>}
             </div>
+
+            {isOwner && (
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-black text-amber-900">
+                  {t(
+                    "machineDetails.yourOwnListing",
+                    "Your Listing"
+                  )}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-amber-800/80">
+                  {t(
+                    "machineDetails.cannotBookOwnListing",
+                    "You cannot book your own listing."
+                  )}
+                </p>
+              </div>
+            )}
 
             {/* TRUST */}
 
@@ -1299,6 +1431,12 @@ function MachineDetails() {
 
             {reviews.map((review) => {
 
+              const isReviewAuthor = Boolean(
+                user?._id &&
+                review.author?._id &&
+                String(review.author._id) === String(user._id)
+              );
+
               const reviewerName =
                 review.reviewerName ||
                 t(
@@ -1360,7 +1498,7 @@ function MachineDetails() {
                         )}
                       </div>
 
-                      <button
+                      {isReviewAuthor && <button
                         type="button"
                         onClick={() =>
                           editReview(review)
@@ -1372,9 +1510,9 @@ function MachineDetails() {
                         )}
                       >
                         <Pencil size={15} />
-                      </button>
+                      </button>}
 
-                      <button
+                      {isReviewAuthor && <button
                         type="button"
                         onClick={() =>
                           deleteReview(
@@ -1388,7 +1526,7 @@ function MachineDetails() {
                         )}
                       >
                         <Trash2 size={15} />
-                      </button>
+                      </button>}
 
                     </div>
                   </div>
@@ -1568,24 +1706,40 @@ function MachineDetails() {
                     />
                   </label>
 
-                  <label className="text-sm font-bold text-slate-700">
+                  <div className="text-sm font-bold text-slate-700">
                     {t(
                       "machineDetails.farmLocation",
                       "Farm location"
                     )}
 
-                    <input
-                      required
-                      name="customerLocation"
-                      value={
-                        bookingForm.customerLocation
-                      }
-                      onChange={
-                        updateBookingField
-                      }
-                      className="mt-1.5 h-12 w-full rounded-xl border border-slate-200 px-3 font-medium outline-none focus:border-green-600"
-                    />
-                  </label>
+                    <div className="mt-1.5 flex gap-2">
+                      <input
+                        required
+                        name="customerLocation"
+                        value={
+                          bookingForm.customerLocation
+                        }
+                        onChange={
+                          updateBookingField
+                        }
+                        className="h-12 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 font-medium outline-none focus:border-green-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={detectBookingLocation}
+                        disabled={bookingLocationStatus === "detecting"}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-green-700 px-3 text-xs font-black text-white disabled:opacity-60"
+                      >
+                        <MapPin size={15} />
+                        {bookingLocationStatus === "detecting" ? "Detecting" : "Use location"}
+                      </button>
+                    </div>
+                    {bookingLocationMessage && (
+                      <p className={`mt-1 text-xs font-medium ${bookingLocationStatus === "failed" ? "text-amber-700" : "text-green-700"}`}>
+                        {bookingLocationMessage}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -1727,36 +1881,47 @@ function MachineDetails() {
             />
           </button>
 
-          <button
+          {!isOwner && <button
             type="button"
             onClick={() => openBooking("fast")}
-            disabled={!isAvailable}
+            disabled={!isAvailable || isOwner}
             className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#176b3a] px-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Clock3 size={17} />
 
-            {t(
-              "machineDetails.fastBooking",
-              "Fast Booking"
-            )}
-          </button>
+            {isOwner
+              ? t(
+                  "machineDetails.yourOwnListing",
+                  "Your Listing"
+                )
+              : t(
+                  "machineDetails.fastBooking",
+                  "Fast Booking"
+                )}
+          </button>}
 
-          <button
+          {!isOwner && <button
             type="button"
             onClick={() => openBooking("group")}
-            disabled={!isAvailable}
+            disabled={!isAvailable || isOwner}
             className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-green-50 px-3 text-xs font-black text-green-800 ring-1 ring-green-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Tractor size={17} />
 
-            {t(
-              "machineDetails.groupBooking",
-              "Group Booking"
-            )}
-          </button>
+            {isOwner
+              ? t(
+                  "machineDetails.yourOwnListing",
+                  "Your Listing"
+                )
+              : t(
+                  "machineDetails.groupBooking",
+                  "Group Booking"
+                )}
+          </button>}
 
         </div>
       </div>
+
     </main>
   );
 }

@@ -13,6 +13,7 @@ import {
   Home,
   Sprout,
   ClipboardList,
+  MessageCircle,
   Plus,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -52,10 +53,10 @@ function Navbar() {
     ) || languages[0];
 
   const dashboardPath =
-    user?.role === "Driver"
-      ? "/driver/dashboard"
-      : user?.role === "Admin"
-        ? "/admin/dashboard"
+    user?.isAdmin
+      ? "/admin/dashboard"
+      : user?.role === "Driver"
+        ? "/Drivers"
         : "/machine";
 
   // --------------------------------------------------
@@ -113,28 +114,41 @@ function Navbar() {
   // NAV ITEMS
   // --------------------------------------------------
 
-  const navItems = [
-    {
-      to: "/",
-      label: t("navbar.home", "Home"),
-      icon: Home,
-    },
-    {
-      to: "/machine",
-      label: t("navbar.machinery", "Machinery"),
-      icon: Tractor,
-    },
-    {
-      to: "/services",
-      label: t("navbar.services", "Services"),
-      icon: Sprout,
-    },
-    {
-      to: "/bookings",
-      label: t("navbar.bookings", "My Bookings"),
-      icon: ClipboardList,
-    },
-  ];
+  const navItems = user?.role === "Driver"
+    ? [
+        { to: "/Drivers", label: "Dashboard", icon: Home },
+        { to: "/driver/listings/new", label: "Add machine", icon: Plus },
+        { to: "/machine", label: "Machinery", icon: Tractor },
+        { to: "/bookings", label: "My bookings", icon: ClipboardList },
+        { to: "/chat", label: "Chats", icon: MessageCircle },
+      ]
+    : [
+        {
+          to: "/",
+          label: t("navbar.home", "Home"),
+          icon: Home,
+        },
+        {
+          to: "/machine",
+          label: t("navbar.machinery", "Machinery"),
+          icon: Tractor,
+        },
+        {
+          to: "/services",
+          label: t("navbar.services", "Services"),
+          icon: Sprout,
+        },
+        {
+          to: "/bookings",
+          label: t("navbar.bookings", "My Bookings"),
+          icon: ClipboardList,
+        },
+        {
+          to: "/chat",
+          label: "Chat",
+          icon: MessageCircle,
+        },
+      ];
 
   return (
     <>

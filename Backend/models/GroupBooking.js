@@ -40,6 +40,9 @@ const groupBookingSchema = new mongoose.Schema(
       enum: ["Forming", "Ready", "RequestSent", "Accepted", "Rejected", "Completed", "Cancelled"],
       default: "Forming"
     },
+    completionOtp: { type: String, select: false },
+    completionOtpExpiresAt: { type: Date, select: false },
+    otpVerified: { type: Boolean, default: false },
     bookingDate: { type: Date, required: true }
   },
   { timestamps: true }

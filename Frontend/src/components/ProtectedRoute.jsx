@@ -7,7 +7,9 @@ function ProtectedRoute({ children, roles }) {
 
   if (loading) return <main className="flex min-h-screen items-center justify-center">Loading...</main>;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/403" replace />;
+  if (roles && !roles.some((role) => role === "Admin" ? user.isAdmin === true : user.role === role)) {
+    return <Navigate to="/403" replace />;
+  }
   return children;
 }
 

@@ -9,7 +9,7 @@ const signupSchema = Joi.object({
   confirmPassword: Joi.string().valid(Joi.ref("password")).required().messages({
     "any.only": "Passwords must match."
   }),
-  role: Joi.string().valid("Farmer", "Driver").default("Farmer"),
+  role: Joi.string().valid("Farmer").default("Farmer"),
   location: Joi.string().trim().max(200).allow(""),
   latitude: Joi.number().min(-90).max(90).optional(),
   longitude: Joi.number().min(-180).max(180).optional()

@@ -2,7 +2,8 @@ import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Check, ChevronDown, Globe2 } from "lucide-react";
+import { Check, ChevronDown, ClipboardList, Globe2 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 /*
 const NEARBY_RADIUS_KM = 50;
@@ -23,6 +24,7 @@ const distanceInKilometers = (firstPoint, secondPoint) => {
 function Machines() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   const [machines, setMachines] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -284,7 +286,7 @@ function Machines() {
 
           {/* Top bar */}
 
-          <div className="mb-10 flex items-center justify-between">
+          <div className="mb-10 flex flex-wrap items-center justify-between gap-3">
 
             <div className="flex items-center gap-3">
 
@@ -305,6 +307,7 @@ function Machines() {
 
             {/* Selected language */}
 
+            <div className="ml-auto flex items-center gap-2">
             <div className="relative">
               <button
                 type="button"
@@ -346,6 +349,10 @@ function Machines() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {isAuthenticated && <button type="button" onClick={() => navigate("/bookings")} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-xs font-black text-green-900 shadow-lg transition hover:bg-lime-50"><ClipboardList size={15} /><span className="hidden sm:inline">My Bookings</span><span className="sm:hidden">Bookings</span></button>}
+
             </div>
 
           </div>

@@ -213,10 +213,10 @@ function App() {
   const { user, isAuthenticated, logout } = useAuth();
 
   const dashboardPath =
-    user?.role === "Driver"
-      ? "/driver/dashboard"
-      : user?.role === "Admin"
-        ? "/admin/dashboard"
+    user?.isAdmin
+      ? "/admin/dashboard"
+      : user?.role === "Driver"
+        ? "/Drivers"
         : "/machine";
 
   useEffect(() => {

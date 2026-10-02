@@ -16,10 +16,19 @@ function Login() {
     setLoading(true);
     setError("");
     try {
-      const user = await login(form);
-      navigate(user.role === "Driver" ? "/driver/dashboard" : user.role === "Admin" ? "/admin/dashboard" : "/machine", { replace: true });
+      const user = await login({
+        phone: form.phone.trim(),
+        password: form.password,
+      });
+      navigate(user.isAdmin ? "/admin/dashboard" : user.role === "Driver" ? "/Drivers" : "/machine", { replace: true });
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Invalid phone or password.");
+      if (!requestError.response) {
+        setError("Server se connection nahi ho pa raha. Backend server start karke dobara try karein.");
+      } else if (requestError.response.status === 429) {
+        setError("Too many login attempts. Please wait 15 minutes and try again.");
+      } else {
+        setError(requestError.response.data?.message || "Invalid phone or password.");
+      }
     } finally {
       setLoading(false);
     }

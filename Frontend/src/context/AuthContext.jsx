@@ -53,7 +53,9 @@ export function AuthProvider({ children }) {
   // Registration backend already calls req.login(),
   // so this function immediately updates frontend auth state.
   const register = async (formData) => {
-    const response = await api.post("/auth/register", formData);
+    const response = await api.post("/auth/register", formData, {
+      headers: formData instanceof FormData ? undefined : { "Content-Type": "application/json" },
+    });
 
     if (!response.data?.user) {
       throw new Error("Registration response did not contain user data.");

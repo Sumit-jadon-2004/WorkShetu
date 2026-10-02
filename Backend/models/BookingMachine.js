@@ -209,6 +209,21 @@ totalPrice: {
             "Cancelled"
         ],
         default: "Pending"
+    },
+
+    completionOtp: {
+        type: String,
+        select: false
+    },
+
+    completionOtpExpiresAt: {
+        type: Date,
+        select: false
+    },
+
+    otpVerified: {
+        type: Boolean,
+        default: false
     }
 
 }, {

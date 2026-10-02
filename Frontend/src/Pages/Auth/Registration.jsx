@@ -162,13 +162,7 @@ function Registration() {
       const user = await register(form);
 
       // Automatically redirect after successful signup.
-      if (user.role === "Driver") {
-        navigate("/driver/dashboard", { replace: true });
-      } else if (user.role === "Admin") {
-        navigate("/admin/dashboard", { replace: true });
-      } else {
-        navigate("/machine", { replace: true });
-      }
+      navigate("/machine", { replace: true });
     } catch (requestError) {
       setError(
         requestError.response?.data?.message ||
@@ -271,20 +265,6 @@ function Registration() {
               />
             </label>
           </div>
-
-          <label className="mt-4 block text-sm font-bold">
-            Account type
-
-            <select
-              name="role"
-              value={form.role}
-              onChange={updateField}
-              className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
-            >
-              <option value="Farmer">Farmer</option>
-              <option value="Driver">Driver</option>
-            </select>
-          </label>
 
           <label className="mt-4 block text-sm font-bold">
             Location

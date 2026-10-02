@@ -20,7 +20,7 @@ router.post("/register", authLimiter, async (req, res) => {
     const user = await User.register({
       fullName: value.fullName,
       phone: value.phone,
-      role: value.role,
+      role: "Farmer",
       location: value.location || undefined,
       latitude: value.latitude,
       longitude: value.longitude,
