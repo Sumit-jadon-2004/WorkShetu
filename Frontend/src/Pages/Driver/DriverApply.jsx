@@ -1,816 +1,811 @@
-import {
-    useEffect,
-    useState
-} from "react";
-
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
-
 import {
-    Camera,
-    X,
-    Upload,
-    CheckCircle,
-    Clock,
-    XCircle,
-    User,
-    Phone,
-    MapPin,
-    Truck,
-    Briefcase
+  Briefcase,
+  Check,
+  CheckCircle,
+  Clock,
+  ImagePlus,
+  LocateFixed,
+  Phone,
+  ShieldCheck,
+  Tractor,
+  Truck,
+  Upload,
+  User,
+  X,
+  XCircle,
 } from "lucide-react";
+import Navbar from "../UI/Navbar.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { useTranslation } from "react-i18next";
 
+const categories = ["Tractor", "Cultivator", "Rotavator", "Harrow", "Harvester"];
+const units = ["Hour", "Bigha", "Acre", "Hectare", "Day", "Trip"];
+const fuelTypes = ["Diesel", "Petrol", "Electric", "CNG", "Hybrid"];
 
 export default function DriverApply() {
-
-    const [form, setForm] = useState({
-
-        fullName: "",
-        phone: "",
-        address: "",
-        vehicleType: "",
-        vehicleNumber: "",
-        experience: "",
-        message: ""
-    });
-
-
-    const [equipmentImage, setEquipmentImage] =
-        useState(null);
-
-    const [imagePreview, setImagePreview] =
-        useState("");
-
-
-    const [loading, setLoading] =
-        useState(false);
-
-    const [success, setSuccess] =
-        useState("");
-
-    const [error, setError] =
-        useState("");
-
-    const [application, setApplication] =
-        useState(null);
-
-    const [applicationLoading, setApplicationLoading] =
-        useState(true);
-
-    const fetchApplication = async () => {
-        try {
-            const response = await axios.get("/api/driver/application");
-            if (response.data.success) {
-                setApplication(response.data.application);
-            }
-        } catch (requestError) {
-            if (requestError.response?.status !== 401) {
-                console.error("GET DRIVER APPLICATION:", requestError);
-            }
-        } finally {
-            setApplicationLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchApplication();
-    }, []);
-
-
-    // ==================================================
-    // INPUT CHANGE
-    // ==================================================
-
-    const handleChange = (event) => {
-
-        const {
-            name,
-            value
-        } = event.target;
-
-
-        setForm((previous) => ({
-
-            ...previous,
-
-            [name]: value
-        }));
-    };
-
-
-    // ==================================================
-    // IMAGE CHANGE
-    // ==================================================
-
-    const handleImageChange = (event) => {
-
-        const file =
-            event.target.files?.[0];
-
-
-        if (!file) return;
-
-
-        // Image type
-        if (!file.type.startsWith("image/")) {
-
-            setError(
-                "Please upload a valid image."
-            );
-
-            return;
-        }
-
-
-        // 5 MB
-        if (file.size > 5 * 1024 * 1024) {
-
-            setError(
-                "Image size must be less than 5 MB."
-            );
-
-            return;
-        }
-
-
-        setError("");
-
-        setEquipmentImage(file);
-
-
-        const previewUrl =
-            URL.createObjectURL(file);
-
-
-        setImagePreview(previewUrl);
-    };
-
-
-    // ==================================================
-    // REMOVE IMAGE
-    // ==================================================
-
-    const removeImage = () => {
-
-        if (imagePreview) {
-
-            URL.revokeObjectURL(
-                imagePreview
-            );
-        }
-
-
-        setEquipmentImage(null);
-
-        setImagePreview("");
-    };
-
-
-    // ==================================================
-    // CLEANUP
-    // ==================================================
-
-    useEffect(() => {
-
-        return () => {
-
-            if (imagePreview) {
-
-                URL.revokeObjectURL(
-                    imagePreview
-                );
-            }
-        };
-
-    }, [imagePreview]);
-
-
-    // ==================================================
-    // SUBMIT
-    // ==================================================
-
-    const handleSubmit = async (event) => {
-
-        event.preventDefault();
-
-
-        setLoading(true);
-
-        setError("");
-
-        setSuccess("");
-
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [form, setForm] = useState({
+    fullName: user?.fullName || "",
+    phone: user?.phone || "",
+    aadhaarNumber: "",
+    licenseNumber: "",
+    experience: "2",
+    address: user?.location || user?.driverAddress || "",
+    latitude: user?.latitude || "",
+    longitude: user?.longitude || "",
+    // First Listing fields (styled like AddListing)
+    title: "",
+    category: "Tractor",
+    vehicleNumber: "",
+    price: "600",
+    unit: "Hour",
+    power: "45",
+    fuelType: "Diesel",
+    year: String(new Date().getFullYear()),
+    description: "",
+  });
+
+  const [equipmentImage, setEquipmentImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+
+  const [application, setApplication] = useState(null);
+  const [applicationLoading, setApplicationLoading] = useState(true);
+
+  const [locationStatus, setLocationStatus] = useState("idle");
+  const [locationMessage, setLocationMessage] = useState("");
+
+  // Auto-fill user details (Name, Mobile, Location) from profile
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        fullName: prev.fullName || user.fullName || "",
+        phone: prev.phone || user.phone || "",
+        address: prev.address || user.location || user.driverAddress || "",
+        latitude: prev.latitude || user.latitude || "",
+        longitude: prev.longitude || user.longitude || "",
+      }));
+    }
+  }, [user]);
+
+  const fetchApplication = async () => {
+    try {
+      const response = await axios.get("/api/driver/application", {
+        withCredentials: true,
+      });
+      if (response.data.success) {
+        setApplication(response.data.application);
+      }
+    } catch (requestError) {
+      if (requestError.response?.status !== 401) {
+        console.error("GET DRIVER APPLICATION:", requestError);
+      }
+    } finally {
+      setApplicationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApplication();
+  }, []);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image size must be less than 5 MB.");
+      return;
+    }
+
+    setError("");
+    setEquipmentImage(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const removeImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setEquipmentImage(null);
+    setImagePreview("");
+  };
+
+  useEffect(() => () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+  }, [imagePreview]);
+
+  // Auto-detect location & address
+  const detectLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus("failed");
+      setLocationMessage("Geolocation is unavailable on this browser. Enter address manually.");
+      return;
+    }
+
+    setLocationStatus("detecting");
+    setLocationMessage("Fetching your current location...");
+
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        const { latitude, longitude } = coords;
+        setForm((current) => ({ ...current, latitude, longitude }));
 
         try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+            { headers: { "Accept-Language": "en" } }
+          );
+          if (!response.ok) throw new Error("Reverse geocoding failed");
+          const addressData = (await response.json()).address || {};
+          const fullAddress = [
+            addressData.village ||
+              addressData.locality ||
+              addressData.town ||
+              addressData.suburb ||
+              addressData.city,
+            addressData.district || addressData.county,
+            addressData.state,
+            addressData.country,
+          ]
+            .filter(Boolean)
+            .join(", ")
+            .slice(0, 200);
 
-            // Image required
-            if (!equipmentImage) {
-
-                setError(
-                    "Please upload agricultural equipment photo."
-                );
-
-                setLoading(false);
-
-                return;
-            }
-
-
-            const formData =
-                new FormData();
-
-
-            formData.append(
-                "fullName",
-                form.fullName
-            );
-
-            formData.append(
-                "phone",
-                form.phone
-            );
-
-            formData.append(
-                "address",
-                form.address
-            );
-
-            formData.append(
-                "vehicleType",
-                form.vehicleType
-            );
-
-            formData.append(
-                "vehicleNumber",
-                form.vehicleNumber
-            );
-
-            formData.append(
-                "experience",
-                form.experience
-            );
-
-            formData.append(
-                "message",
-                form.message
-            );
-
-
-            formData.append(
-                "equipmentImage",
-                equipmentImage
-            );
-
-
-            const response =
-                await axios.post(
-                    "/api/driver/apply",
-                    formData
-                );
-
-
-            if (response.data.success) {
-
-                setSuccess(
-                    response.data.message
-                );
-
-
-                // Clear form
-                setForm({
-
-                    fullName: "",
-                    phone: "",
-                    address: "",
-                    vehicleType: "",
-                    vehicleNumber: "",
-                    experience: "",
-                    message: ""
-                });
-
-
-                removeImage();
-                await fetchApplication();
-            }
-
-
-        } catch (err) {
-
-            console.error(
-                "DRIVER APPLY ERROR:",
-                err
-            );
-
-
-            setError(
-                err.response?.data?.message ||
-                "Something went wrong. Please try again."
-            );
-
-
-        } finally {
-
-            setLoading(false);
+          setForm((current) => ({
+            ...current,
+            address: fullAddress,
+          }));
+          setLocationStatus("success");
+          setLocationMessage(
+            fullAddress
+              ? `Location detected: ${fullAddress}`
+              : "Coordinates found; enter village/city name manually."
+          );
+        } catch {
+          setLocationStatus("success");
+          setLocationMessage("Coordinates detected; please confirm your village or city name.");
         }
-    };
-
-
-    return (
-
-        <main className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950">
-
-            <div className="mx-auto max-w-3xl">
-
-                {/* Header */}
-
-                <div className="mb-8 text-center">
-
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-green-600 text-white shadow-lg">
-
-                        <Truck size={32} />
-
-                    </div>
-
-
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white">
-
-                        Become a Driver
-
-                    </h1>
-
-
-                    <p className="mt-2 text-slate-500 dark:text-slate-400">
-
-                        Create your Driver profile and start offering your equipment and services.
-
-                    </p>
-
-                </div>
-
-
-                {/* Messages */}
-
-                {success && (
-
-                    <div className="mb-6 flex items-center gap-3 rounded-2xl border border-green-200 bg-green-50 p-4 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-400">
-
-                        <CheckCircle size={22} />
-
-                        <span>{success}</span>
-
-                    </div>
-
-                )}
-
-
-                {error && (
-
-                    <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
-
-                        {error}
-
-                    </div>
-
-                )}
-
-
-                {!applicationLoading && application?.driverApplicationStatus !== "None" && (
-                    <ApplicationStatus application={application} />
-                )}
-
-                {(!application || application.driverApplicationStatus === "None" || application.driverApplicationStatus === "Rejected") && (
-                <form
-                    onSubmit={handleSubmit}
-                    className="space-y-6 rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-900 md:p-8"
-                >
-
-                    {/* ============================
-                        PERSONAL DETAILS
-                    ============================ */}
-
-                    <div>
-
-                        <h2 className="mb-5 text-xl font-bold text-slate-900 dark:text-white">
-
-                            Personal Details
-
-                        </h2>
-
-
-                        <div className="grid gap-5 md:grid-cols-2">
-
-                            <div>
-
-                                <label className="mb-2 block text-sm font-semibold">
-
-                                    Full Name
-
-                                </label>
-
-                                <div className="relative">
-
-                                    <User
-                                        className="absolute left-3 top-3.5 text-slate-400"
-                                        size={18}
-                                    />
-
-                                    <input
-                                        name="fullName"
-                                        value={form.fullName}
-                                        onChange={handleChange}
-                                        required
-                                        minLength={3}
-                                        className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 outline-none focus:border-green-500 dark:border-slate-700 dark:bg-slate-800"
-                                        placeholder="Enter your full name"
-                                    />
-
-                                </div>
-
-                            </div>
-
-
-                            <div>
-
-                                <label className="mb-2 block text-sm font-semibold">
-
-                                    Phone
-
-                                </label>
-
-                                <div className="relative">
-
-                                    <Phone
-                                        className="absolute left-3 top-3.5 text-slate-400"
-                                        size={18}
-                                    />
-
-                                    <input
-                                        name="phone"
-                                        value={form.phone}
-                                        onChange={handleChange}
-                                        required
-                                        pattern="[6-9][0-9]{9}"
-                                        maxLength={10}
-                                        className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 outline-none focus:border-green-500 dark:border-slate-700 dark:bg-slate-800"
-                                        placeholder="10 digit mobile number"
-                                    />
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    {/* Address */}
-
-                    <div>
-
-                        <label className="mb-2 block text-sm font-semibold">
-
-                            Address
-
-                        </label>
-
-                        <div className="relative">
-
-                            <MapPin
-                                className="absolute left-3 top-3.5 text-slate-400"
-                                size={18}
-                            />
-
-                            <textarea
-                                name="address"
-                                value={form.address}
-                                onChange={handleChange}
-                                required
-                                rows={3}
-                                className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 outline-none focus:border-green-500 dark:border-slate-700 dark:bg-slate-800"
-                                placeholder="Enter your complete address"
-                            />
-
-                        </div>
-
-                    </div>
-
-
-                    {/* ============================
-                        EQUIPMENT DETAILS
-                    ============================ */}
-
-                    <div>
-
-                        <h2 className="mb-5 text-xl font-bold text-slate-900 dark:text-white">
-
-                            Equipment Details
-
-                        </h2>
-
-
-                        <div className="grid gap-5 md:grid-cols-2">
-
-                            <div>
-
-                                <label className="mb-2 block text-sm font-semibold">
-
-                                    Vehicle / Equipment Type
-
-                                </label>
-
-                                <select
-                                    name="vehicleType"
-                                    value={form.vehicleType}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-green-500 dark:border-slate-700 dark:bg-slate-800"
-                                >
-
-                                    <option value="">
-                                        Select equipment
-                                    </option>
-
-                                    <option value="Tractor">
-                                        Tractor
-                                    </option>
-
-                                    <option value="Harvester">
-                                        Harvester
-                                    </option>
-
-                                    <option value="Cultivator">
-                                        Cultivator
-                                    </option>
-
-                                    <option value="Rotavator">
-                                        Rotavator
-                                    </option>
-
-                                    <option value="Harrow">
-                                        Harrow
-                                    </option>
-
-                                    <option value="Loader">
-                                        Loader
-                                    </option>
-
-                                    <option value="Truck">
-                                        Truck
-                                    </option>
-
-                                    <option value="Other">
-                                        Other
-                                    </option>
-
-                                </select>
-
-                            </div>
-
-
-                            <div>
-
-                                <label className="mb-2 block text-sm font-semibold">
-
-                                    Vehicle Number
-
-                                </label>
-
-                                <input
-                                    name="vehicleNumber"
-                                    value={form.vehicleNumber}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full rounded-xl border border-slate-200 px-4 py-3 uppercase outline-none focus:border-green-500 dark:border-slate-700 dark:bg-slate-800"
-                                    placeholder="e.g. UP80AB1234"
-                                />
-
-                            </div>
-
-
-                            <div>
-
-                                <label className="mb-2 block text-sm font-semibold">
-
-                                    Experience (Years)
-
-                                </label>
-
-                                <div className="relative">
-
-                                    <Briefcase
-                                        className="absolute left-3 top-3.5 text-slate-400"
-                                        size={18}
-                                    />
-
-                                    <input
-                                        type="number"
-                                        name="experience"
-                                        value={form.experience}
-                                        onChange={handleChange}
-                                        min="0"
-                                        max="70"
-                                        required
-                                        className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 outline-none focus:border-green-500 dark:border-slate-700 dark:bg-slate-800"
-                                        placeholder="Years"
-                                    />
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    {/* ============================
-                        EQUIPMENT PHOTO
-                    ============================ */}
-
-                    <div>
-
-                        <label className="mb-2 block text-sm font-semibold">
-
-                            Agricultural Equipment Photo
-
-                        </label>
-
-
-                        {!imagePreview ? (
-
-                            <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center transition hover:border-green-500 hover:bg-green-50 dark:border-slate-700 dark:hover:bg-green-950/20">
-
-                                <Camera
-                                    size={36}
-                                    className="mb-3 text-slate-400"
-                                />
-
-
-                                <span className="font-semibold text-slate-700 dark:text-slate-200">
-
-                                    Upload Equipment Photo
-
-                                </span>
-
-
-                                <span className="mt-1 text-sm text-slate-500">
-
-                                    JPG, PNG, WEBP • Maximum 5 MB
-
-                                </span>
-
-
-                                <input
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/webp"
-                                    onChange={handleImageChange}
-                                    className="hidden"
-                                />
-
-                            </label>
-
-                        ) : (
-
-                            <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
-
-                                <img
-                                    src={imagePreview}
-                                    alt="Equipment preview"
-                                    className="h-72 w-full object-cover"
-                                />
-
-
-                                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 p-3 text-white">
-
-                                    <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-white/20 px-3 py-2 text-sm font-semibold backdrop-blur">
-
-                                        <Upload size={16} />
-
-                                        Change
-
-                                        <input
-                                            type="file"
-                                            accept="image/png,image/jpeg,image/webp"
-                                            onChange={handleImageChange}
-                                            className="hidden"
-                                        />
-
-                                    </label>
-
-
-                                    <button
-                                        type="button"
-                                        onClick={removeImage}
-                                        className="flex items-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-sm font-semibold"
-                                    >
-
-                                        <X size={16} />
-
-                                        Remove
-
-                                    </button>
-
-                                </div>
-
-                            </div>
-
-                        )}
-
-                    </div>
-
-
-                    {/* Message */}
-
-                    <div>
-
-                        <label className="mb-2 block text-sm font-semibold">
-
-                            Additional Message
-
-                        </label>
-
-                        <textarea
-                            name="message"
-                            value={form.message}
-                            onChange={handleChange}
-                            rows={4}
-                            maxLength={1000}
-                            className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-green-500 dark:border-slate-700 dark:bg-slate-800"
-                            placeholder="Tell us anything else about your equipment or experience..."
-                        />
-
-                    </div>
-
-
-                    {/* Submit */}
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3.5 font-bold text-white shadow-lg transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-
-                        {loading
-                            ? "Submitting..."
-                            : "Submit Driver Application"
-                        }
-
-                    </button>
-
-                    <p className="text-center text-xs text-slate-500">
-
-                        Your application will be reviewed by the WorkShetu admin team before Driver access is granted.
-
-                    </p>
-
-                </form>
-                )}
-
+      },
+      () => {
+        setLocationStatus("failed");
+        setLocationMessage("Location permission denied. Enter your address manually.");
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
+  // Automatically trigger location detection on load if address is empty
+  useEffect(() => {
+    if (!form.address) {
+      detectLocation();
+    }
+  }, []);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      if (!form.fullName || form.fullName.trim().length < 3) {
+        setError("Please enter your full name (at least 3 characters).");
+        setLoading(false);
+        return;
+      }
+
+      const digits = (form.phone || "").replace(/\D/g, "");
+      if (digits.length !== 10) {
+        setError("Please enter a valid 10-digit Indian mobile number.");
+        setLoading(false);
+        return;
+      }
+
+      const aadhaarDigits = (form.aadhaarNumber || "").replace(/\D/g, "");
+      if (aadhaarDigits.length !== 12) {
+        setError("Please enter a valid 12-digit Aadhaar Card number.");
+        setLoading(false);
+        return;
+      }
+
+      const cleanLicense = (form.licenseNumber || "").trim().toUpperCase();
+      if (!cleanLicense || cleanLicense.length < 5) {
+        setError("Please enter a valid Driving License (DL) number.");
+        setLoading(false);
+        return;
+      }
+
+      if (!form.address || form.address.trim().length < 5) {
+        setError("Please enter or auto-detect your full address.");
+        setLoading(false);
+        return;
+      }
+
+      if (["Tractor", "Harvester"].includes(form.category) && !form.vehicleNumber?.trim()) {
+        setError("Vehicle registration number is required for tractors and harvesters.");
+        setLoading(false);
+        return;
+      }
+
+      if (!equipmentImage) {
+        setError("Please upload an agricultural equipment photo.");
+        setLoading(false);
+        return;
+      }
+
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          formData.append(key, value);
+        }
+      });
+      formData.set("aadhaarNumber", aadhaarDigits);
+      formData.set("licenseNumber", cleanLicense);
+      formData.append("drivingLicense", cleanLicense);
+      formData.append("equipmentImage", equipmentImage);
+      // Map vehicleType for backwards compatibility
+      formData.append("vehicleType", form.category);
+
+      const response = await axios.post("/api/driver/apply", formData, {
+        withCredentials: true,
+      });
+
+      if (response.data.success) {
+        setSuccess(
+          "Application submitted successfully! Once approved by Admin, your account and first machine listing will be activated."
+        );
+        removeImage();
+        await fetchApplication();
+      }
+    } catch (err) {
+      console.error("DRIVER APPLY ERROR:", err);
+      const errMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        (typeof err.response?.data === "string" && !err.response.data.includes("<html")
+          ? err.response.data
+          : null) ||
+        err.message ||
+        "Something went wrong. Please check your network and try again.";
+      setError(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const needsVehicleDetails = ["Tractor", "Harvester"].includes(form.category);
+
+  return (
+    <main className="min-h-screen bg-[#f6f8f3] dark:bg-slate-950">
+      <Navbar />
+
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        {/* Header */}
+        <div className="mb-8">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700 dark:text-lime-300">
+            WorkShetu Partner Network
+          </p>
+          <h1 className="mt-2 text-3xl font-black text-slate-900 dark:text-white">
+            Driver Onboarding & First Listing
+          </h1>
+          <p className="mt-2 text-slate-500 dark:text-slate-400">
+            Apply to become a verified Driver and register your first equipment. Once approved by Admin, your machine will automatically go live for farmers to book!
+          </p>
+        </div>
+
+        {/* Status Messages */}
+        {success && (
+          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-green-200 bg-green-50 p-4 text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
+            <CheckCircle size={22} className="shrink-0" />
+            <span className="text-sm font-semibold">{success}</span>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+            <XCircle size={22} className="shrink-0" />
+            <span className="text-sm font-semibold">{error}</span>
+          </div>
+        )}
+
+        {/* Existing Application Status Banner */}
+        {!applicationLoading && application?.driverApplicationStatus !== "None" && (
+          <ApplicationStatus application={application} />
+        )}
+
+        {/* Application Form */}
+        {(!application ||
+          application.driverApplicationStatus === "None" ||
+          application.driverApplicationStatus === "Rejected") && (
+          <form
+            onSubmit={handleSubmit}
+            autoComplete="off"
+            className="space-y-6 rounded-3xl bg-white p-6 shadow-xl dark:bg-slate-900 sm:p-8"
+          >
+            {/* ====================================================
+                SECTION 1: DRIVER PERSONAL INFORMATION
+            ==================================================== */}
+            <div className="border-b border-slate-100 pb-6 dark:border-slate-800">
+              <div className="flex items-center gap-2 text-lg font-black text-slate-900 dark:text-white">
+                <User className="text-green-700 dark:text-lime-400" size={20} />
+                Driver Profile Details
+              </div>
+
+              <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Full Name
+                  <input
+                    name="fullName"
+                    required
+                    minLength={3}
+                    autoComplete="off"
+                    value={form.fullName}
+                    onChange={handleChange}
+                    placeholder="Enter full name"
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Mobile Number
+                  <input
+                    name="phone"
+                    required
+                    type="tel"
+                    pattern="[0-9]{10}"
+                    maxLength={10}
+                    autoComplete="off"
+                    value={form.phone}
+                    onChange={handleChange}
+                    placeholder="10-digit mobile number"
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Aadhaar Card Number
+                  <input
+                    name="aadhaarNumber"
+                    required
+                    type="text"
+                    maxLength={14}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    value={form.aadhaarNumber}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 12);
+                      const formatted = digits.replace(/(\d{4})(?=\d)/g, "$1 ");
+                      setForm((prev) => ({ ...prev, aadhaarNumber: formatted }));
+                    }}
+                    placeholder="12-digit Aadhaar number"
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium tracking-wider outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Driving License Number
+                  <input
+                    name="licenseNumber"
+                    required
+                    type="text"
+                    maxLength={20}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    value={form.licenseNumber}
+                    onChange={(e) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        licenseNumber: e.target.value.toUpperCase(),
+                      }));
+                    }}
+                    placeholder="Driving License number"
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium uppercase tracking-wider outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Driving Experience (Years)
+                  <input
+                    name="experience"
+                    type="number"
+                    min="0"
+                    max="50"
+                    autoComplete="off"
+                    value={form.experience}
+                    onChange={handleChange}
+                    placeholder="Experience in years (e.g. 3)"
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+              </div>
             </div>
 
-        </main>
-    );
+            {/* ====================================================
+                SECTION 2: AUTO-DETECT LOCATION & SERVICE ADDRESS
+            ==================================================== */}
+            <div className="rounded-2xl border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-slate-900 dark:text-white">
+                    Driver Address / Service Area
+                    <input
+                      name="address"
+                      required
+                      value={form.address}
+                      onChange={handleChange}
+                      placeholder="Village, Tehsil, District, State"
+                      className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={detectLocation}
+                  disabled={locationStatus === "detecting"}
+                  className="mt-0 inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-green-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-green-800 disabled:cursor-wait disabled:opacity-70 sm:mt-7"
+                >
+                  <LocateFixed
+                    size={17}
+                    className={locationStatus === "detecting" ? "animate-spin" : ""}
+                  />
+                  {locationStatus === "detecting" ? "Fetching..." : "Fetch Location"}
+                </button>
+              </div>
+
+              {locationMessage && (
+                <p
+                  className={`mt-2 text-xs font-semibold ${
+                    locationStatus === "failed" ? "text-amber-700 dark:text-amber-300" : "text-green-700 dark:text-lime-300"
+                  }`}
+                >
+                  {locationMessage}
+                </p>
+              )}
+
+              <input type="hidden" name="latitude" value={form.latitude} />
+              <input type="hidden" name="longitude" value={form.longitude} />
+            </div>
+
+            {/* ====================================================
+                SECTION 3: FIRST MACHINE LISTING DETAILS
+            ==================================================== */}
+            <div className="border-b border-slate-100 pb-6 dark:border-slate-800">
+              <div className="flex items-center gap-2 text-lg font-black text-slate-900 dark:text-white">
+                <Tractor className="text-green-700 dark:text-lime-400" size={20} />
+                First Machine Listing (Auto-published on Approval)
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                This equipment will be listed in the marketplace as soon as Admin approves your application.
+              </p>
+
+              <div className="mt-4">
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Machine Title
+                  <input
+                    name="title"
+                    required
+                    minLength={3}
+                    value={form.title}
+                    onChange={handleChange}
+                    placeholder="e.g. Mahindra 575 DI Tractor with Rotavator"
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Category
+                  <select
+                    name="category"
+                    value={form.category}
+                    onChange={handleChange}
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  >
+                    {categories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Rent Price (₹)
+                  <input
+                    name="price"
+                    required
+                    type="number"
+                    min="1"
+                    value={form.price}
+                    onChange={handleChange}
+                    placeholder="e.g. 600"
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Pricing Unit
+                  <select
+                    name="unit"
+                    value={form.unit}
+                    onChange={handleChange}
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  >
+                    {units.map((unit) => (
+                      <option key={unit} value={unit}>
+                        Per {unit}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Manufacturing Year
+                  <input
+                    name="year"
+                    required
+                    type="number"
+                    min="1980"
+                    max={new Date().getFullYear() + 1}
+                    value={form.year}
+                    onChange={handleChange}
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+              </div>
+
+              {needsVehicleDetails && (
+                <div className="mt-4 grid gap-5 sm:grid-cols-2">
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                    Vehicle Registration Number
+                    <input
+                      name="vehicleNumber"
+                      required
+                      value={form.vehicleNumber}
+                      onChange={handleChange}
+                      placeholder="e.g. UP80AB1234 / HR26DQ5551 / RJ14CD7890"
+                      className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium uppercase outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                    <span className="mt-1 block text-[11px] text-slate-400">
+                      Registration plate from any Indian state / RTO
+                    </span>
+                  </label>
+
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                    Engine Power (HP)
+                    <input
+                      name="power"
+                      required
+                      type="number"
+                      min="1"
+                      value={form.power}
+                      onChange={handleChange}
+                      placeholder="e.g. 50"
+                      className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </label>
+                </div>
+              )}
+
+              {needsVehicleDetails && (
+                <div className="mt-4">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
+                    Fuel Type
+                    <select
+                      name="fuelType"
+                      required
+                      value={form.fuelType}
+                      onChange={handleChange}
+                      className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    >
+                      {fuelTypes.map((fuelType) => (
+                        <option key={fuelType} value={fuelType}>
+                          {fuelType}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* ====================================================
+                SECTION 4: EQUIPMENT PHOTO UPLOAD
+            ==================================================== */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60">
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+                <div className="flex items-center gap-2 text-sm font-black text-slate-800 dark:text-slate-100">
+                  <ImagePlus size={18} className="text-green-700 dark:text-lime-400" />
+                  Machine / Equipment Photo
+                </div>
+                <span className="text-xs font-semibold text-slate-400">Required</span>
+              </div>
+
+              {imagePreview ? (
+                <div className="relative">
+                  <img
+                    src={imagePreview}
+                    alt="Equipment preview"
+                    className="h-60 w-full object-cover"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/70 to-transparent p-4 pt-10">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-xs font-black text-slate-800 shadow transition hover:bg-white">
+                      <Upload size={14} />
+                      Change Photo
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="inline-flex items-center gap-2 rounded-lg bg-red-600/90 px-3 py-2 text-xs font-black text-white shadow transition hover:bg-red-600"
+                    >
+                      <X size={14} />
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <label className="flex cursor-pointer flex-col items-center justify-center px-5 py-10 text-center transition hover:bg-green-50 dark:hover:bg-green-950/20">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300">
+                    <Upload size={22} />
+                  </div>
+                  <span className="text-sm font-black text-slate-800 dark:text-slate-100">
+                    Upload Clear Machine / Tractor Photo
+                  </span>
+                  <span className="mt-1 text-xs text-slate-500">
+                    JPG, PNG or WEBP, maximum 5 MB
+                  </span>
+                  <input
+                    required
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
+                Additional Details / Description
+                <textarea
+                  name="description"
+                  required
+                  minLength={10}
+                  value={form.description}
+                  onChange={handleChange}
+                  rows="3"
+                  placeholder="Describe your machinery, operational area, attachments available, and experience..."
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-green-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+              </label>
+            </div>
+
+            {/* Platform Guarantee / Admin notice */}
+            <div className="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+              <ShieldCheck size={20} className="mt-0.5 shrink-0 text-amber-600" />
+              <div className="text-xs leading-relaxed">
+                <span className="font-bold">Admin Verification Notice:</span> Once you submit this application, our admin team will verify your vehicle details. As soon as approved, your role will be switched to <strong>Driver</strong> and your <strong>First Machine Listing</strong> will automatically be published on the marketplace!
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-700 text-sm font-black text-white shadow-lg shadow-green-900/20 transition hover:bg-green-800 disabled:opacity-50"
+            >
+              {loading ? (
+                "Submitting Application..."
+              ) : (
+                <>
+                  <Check size={18} /> Submit Driver Application & First Listing
+                </>
+              )}
+            </button>
+          </form>
+        )}
+      </div>
+    </main>
+  );
 }
 
 function ApplicationStatus({ application }) {
-    const status = application.driverApplicationStatus;
-    const statusDetails = {
-        Pending: {
-            icon: <Clock size={24} />,
-            title: "Application under review",
-            message: "Your Driver application has been sent to the admin. You can check this page again for the final decision.",
-            classes: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
-        },
-        Approved: {
-            icon: <CheckCircle size={24} />,
-            title: "Application accepted",
-            message: "Congratulations. Your Driver application was accepted by the admin.",
-            classes: "border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/30 dark:text-green-200"
-        },
-        Rejected: {
-            icon: <XCircle size={24} />,
-            title: "Application rejected",
-            message: application.driverRejectionReason || "The admin rejected your Driver application. You can submit a new application below.",
-            classes: "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"
-        }
-    }[status];
+  const status = application.driverApplicationStatus;
+  const statusDetails = {
+    Pending: {
+      icon: <Clock size={24} />,
+      title: "Application Under Review",
+      message:
+        "Your Driver application and First Listing have been received. WorkShetu team is reviewing your documents. Once approved, your driver dashboard will be activated and your machine will be published automatically.",
+      classes:
+        "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200",
+    },
+    Approved: {
+      icon: <CheckCircle size={24} />,
+      title: "Application Accepted!",
+      message:
+        "Congratulations! Your Driver profile has been approved and your machine listing is now active on WorkShetu.",
+      classes:
+        "border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/30 dark:text-green-200",
+    },
+    Rejected: {
+      icon: <XCircle size={24} />,
+      title: "Application Needs Revision",
+      message:
+        application.driverRejectionReason ||
+        "The admin requested changes to your Driver application. You can submit a corrected application below.",
+      classes:
+        "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200",
+    },
+  }[status];
 
-    if (!statusDetails) return null;
+  if (!statusDetails) return null;
 
-    return (
-        <section className={`mb-6 rounded-2xl border p-5 ${statusDetails.classes}`}>
-            <div className="flex items-start gap-3">
-                <div className="mt-0.5">{statusDetails.icon}</div>
-                <div>
-                    <h2 className="font-black">{statusDetails.title}</h2>
-                    <p className="mt-1 text-sm">{statusDetails.message}</p>
-                    {application.driverApplicationDate && (
-                        <p className="mt-2 text-xs opacity-75">
-                            Applied on {new Date(application.driverApplicationDate).toLocaleDateString("en-IN")}
-                        </p>
-                    )}
-                </div>
+  return (
+    <section className={`mb-6 rounded-2xl border p-5 ${statusDetails.classes}`}>
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 shrink-0">{statusDetails.icon}</div>
+        <div>
+          <h2 className="font-black">{statusDetails.title}</h2>
+          <p className="mt-1 text-sm leading-relaxed">{statusDetails.message}</p>
+          {application.driverApplicationDate && (
+            <p className="mt-2 text-xs opacity-75">
+              Submitted on{" "}
+              {new Date(application.driverApplicationDate).toLocaleDateString("en-IN")}
+            </p>
+          )}
+          {(application.driverAadhaarNumber || application.driverLicenseNumber) && (
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              {application.driverAadhaarNumber && (
+                <span className="rounded-lg bg-black/5 px-2.5 py-1 font-semibold dark:bg-white/10">
+                  Aadhaar: •••• •••• {application.driverAadhaarNumber.slice(-4)}
+                </span>
+              )}
+              {application.driverLicenseNumber && (
+                <span className="rounded-lg bg-black/5 px-2.5 py-1 font-semibold dark:bg-white/10">
+                  DL: {application.driverLicenseNumber}
+                </span>
+              )}
             </div>
-        </section>
-    );
+          )}
+        </div>
+      </div>
+    </section>
+  );
 }

@@ -1,0 +1,7 @@
+﻿HEALTH: 
+{"database":"disconnected"}
+STDOUT:
+â—‡ injected env (6) from .env // tip: âŒ˜ custom filepath { path: '/custom/path/.env' }
+â—‡ injected env (0) from .env // tip: âŒ auth for agents [www.vestauth.com]
+API server is running on http://localhost:5000
+STDERR:

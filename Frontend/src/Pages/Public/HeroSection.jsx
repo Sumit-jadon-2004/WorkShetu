@@ -2,6 +2,7 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  ClipboardList,
   UserRound,
   ChevronRight,
   Clock3,
@@ -10,6 +11,8 @@ import {
   MapPin,
   Menu,
   MessageCircle,
+  Moon,
+  Sun,
   Phone,
   Search,
   ShieldCheck,
@@ -22,8 +25,10 @@ import {
 
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useTheme } from "../../context/ThemeContext.jsx";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import PromotionsBanner from "../Common/PromotionsBanner.jsx";
 
 const languages = {
   hi: {
@@ -46,7 +51,7 @@ const languages = {
     services: "हमारी सेवाएं",
     servicesTitle: "खेती के हर काम के लिए",
     servicesText:
-      "आपकी जरूरत चाहे छोटी हो या बड़ी, WorkShetu पर अपने आसपास से solution खोजें।",
+      "आपकी ज़रूरत चाहे छोटी हो या बड़ी, WorkShetu पर अपने आसपास से solution खोजें।",
     machines: "खेती की मशीनें",
     machinesSub: "Tractor • Harvester • Rotavator",
     machinesDesc:
@@ -62,14 +67,14 @@ const languages = {
     view: "अभी देखें",
     how: "कैसे काम करता है",
     howTitle: "सिर्फ 3 आसान steps",
-    step1: "अपनी जरूरत बताएं",
-    step1Text: "Machine, Worker या Driver में से अपनी जरूरत चुनें।",
+    step1: "अपनी ज़रूरत बताएं",
+    step1Text: "Machine, Worker या Driver में से अपनी ज़रूरत चुनें।",
     step2: "अपने आसपास खोजें",
     step2Text: "अपने गांव और आसपास उपलब्ध options देखें।",
     step3: "सीधे बात करके बुक करें",
     step3Text: "Owner या worker को call करें और booking पक्की करें।",
     aboutTag: "Kisan First",
-    aboutTitle: "आपका खेत। आपकी जरूरत। आपका फैसला।",
+    aboutTitle: "आपका खेत। आपकी ज़रूरत। आपका फैसला।",
     aboutText:
       "WorkShetu किसानों को उनके आसपास उपलब्ध machines, workers और drivers से सीधे जोड़ने के लिए बनाया गया है।",
     verified: "Verified Profiles",
@@ -78,7 +83,7 @@ const languages = {
     support: "24/7 Support",
     ctaTitle: "खेती का अगला काम आज ही आसान बनाएं।",
     ctaText:
-      "Machine चाहिए? Worker चाहिए? Transport चाहिए? WorkShetu पर अपनी जरूरत से शुरू करें।",
+      "Machine चाहिए? Worker चाहिए? Transport चाहिए? WorkShetu पर अपनी ज़रूरत से शुरू करें।",
     call: "Call Support",
     whatsapp: "WhatsApp",
     footer: "किसान के साथ, खेती के लिए",
@@ -100,22 +105,22 @@ const languages = {
     worker: "Sign In",
     location: "Around your village",
     searchTitle: "What do you need?",
-    searchValue: "Machine • Worker • Driver",
+    searchValue: "Machine â€¢ Worker â€¢ Driver",
     search: "Search",
     services: "Our Services",
     servicesTitle: "Everything your farm needs",
     servicesText:
       "From machines to skilled workers and transport, find practical solutions around you.",
     machines: "Farm Machines",
-    machinesSub: "Tractor • Harvester • Rotavator",
+    machinesSub: "Tractor â€¢ Harvester â€¢ Rotavator",
     machinesDesc:
       "Find available farming machines near you and contact the owner directly.",
     workers: "Skilled Workers",
-    workersSub: "Sowing • Harvesting • Field Work",
+    workersSub: "Sowing â€¢ Harvesting â€¢ Field Work",
     workersDesc:
       "Connect with experienced and trusted workers from your local area.",
     transport: "Transport & Drivers",
-    transportSub: "Farm • Mandi • Delivery",
+    transportSub: "Farm â€¢ Mandi â€¢ Delivery",
     transportDesc:
       "Find nearby drivers and transport to move your harvest from farm to market.",
     view: "Explore Now",
@@ -154,27 +159,27 @@ const languages = {
     heroSmall: "Kheti ka kaam",
     heroTitle: "Ab aur easy.",
     heroText:
-      "Machine chahiye, worker chahiye ya crop ke liye transport — apne aas-paas service find karein aur directly baat karein.",
+      "Machine chahiye, worker chahiye ya crop ke liye transport â€” apne aas-paas service find karein aur directly baat karein.",
     find: "Machine / Worker Find Karein",
     worker: "SignIn",
     location: "Apne gaon ke aas-paas",
     searchTitle: "Aapko kya chahiye?",
-    searchValue: "Machine • Worker • Driver",
+    searchValue: "Machine â€¢ Worker â€¢ Driver",
     search: "Search Karein",
     services: "Our Services",
     servicesTitle: "Kheti ke har kaam ke liye",
     servicesText:
-      "Machine, worker ya transport — apne area ke aas-paas solution easily find karein.",
+      "Machine, worker ya transport â€” apne area ke aas-paas solution easily find karein.",
     machines: "Farm Machines",
-    machinesSub: "Tractor • Harvester • Rotavator",
+    machinesSub: "Tractor â€¢ Harvester â€¢ Rotavator",
     machinesDesc:
       "Apne gaon ke aas-paas available machines find karein aur owner se directly baat karein.",
     workers: "Skilled Workers",
-    workersSub: "Bowaai • Kataai • Field Work",
+    workersSub: "Bowaai â€¢ Kataai â€¢ Field Work",
     workersDesc:
       "Apne area ke experienced aur trusted workers se directly connect karein.",
     transport: "Transport & Drivers",
-    transportSub: "Farm • Mandi • Delivery",
+    transportSub: "Farm â€¢ Mandi â€¢ Delivery",
     transportDesc:
       "Harvest ko farm se mandi tak le jaane ke liye nearby driver aur transport find karein.",
     view: "Abhi Explore Karein",
@@ -208,18 +213,37 @@ function App() {
   const { i18n } = useTranslation();
   const [comingSoon, setComingSoon] = useState(false);
   const [language, setLanguage] = useState(null);
+  const { darkMode, toggleDarkMode } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
 
-  // Authentication
+  // Authentication & Role Evaluation
   const { user, isAuthenticated, logout } = useAuth();
 
-  const dashboardPath =
-    user?.isAdmin
-      ? "/admin/dashboard"
-      : user?.role === "Driver"
-        ? "/Drivers"
-        : "/machine";
+  const userRole = String(user?.role || "").trim().toLowerCase();
+  const isAdmin = Boolean(user?.isAdmin) || userRole === "admin";
+  const isDriver = !isAdmin && userRole === "driver";
+  const isFarmer = !isAdmin && !isDriver;
+  const isEligibleDriver =
+    isDriver &&
+    user?.driverApplicationStatus === "Approved" &&
+    user?.isActive !== false;
+
+  const dashboardPath = isAdmin
+    ? "/admin/dashboard"
+    : isEligibleDriver
+      ? "/Drivers"
+      : isDriver
+        ? "/driver/apply"
+        : "/bookings";
+
+  const dashboardLabel = isAdmin
+    ? "Admin Dashboard"
+    : isEligibleDriver
+      ? "Driver Dashboard"
+      : isDriver
+        ? "Driver Application"
+        : "My Bookings";
 
   useEffect(() => {
     const saved = localStorage.getItem("workshetu-language");
@@ -277,7 +301,7 @@ function App() {
             </h1>
 
             <p className="mt-2 text-sm text-white/55">
-              Kisan ke saath • Farming ke liye
+              Kisan ke saath â€¢ Farming ke liye
             </p>
 
           </div>
@@ -563,7 +587,7 @@ function App() {
                     to={dashboardPath}
                     className="flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[#18321f] shadow-lg transition hover:bg-green-50"
                   >
-                    Dashboard
+                    {dashboardLabel}
                     <ArrowRight className="h-4 w-4" />
                   </Link>
 
@@ -584,6 +608,16 @@ function App() {
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               )}
+
+                            {/* Theme Toggle */}
+              <button
+                type="button"
+                onClick={toggleDarkMode}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white backdrop-blur-xl transition hover:bg-white/20"
+                aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
 
               {/* Mobile menu */}
               <button
@@ -646,7 +680,7 @@ function App() {
                       onClick={() => setMenuOpen(false)}
                       className="mt-2 rounded-xl bg-green-500 px-4 py-3 text-center text-sm font-bold text-white"
                     >
-                      Dashboard
+                      {dashboardLabel}
                     </Link>
 
                     <button
@@ -717,52 +751,143 @@ function App() {
 
             {/* Buttons */}
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              {/* 1. ADMIN USER */}
+              {isAuthenticated && isAdmin ? (
+                <>
+                  <Link
+                    to="/admin/dashboard"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[260px]"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+                        <ShieldCheck className="h-5 w-5" />
+                      </span>
+                      Admin Dashboard
+                    </span>
+                    <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                  </Link>
 
-              <a
-                href="#services"
-                className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[290px]"
-              >
+                  <a
+                    href="#services"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[240px]"
+                  >
+                    <span className="flex items-center gap-3">
+                      <Tractor className="h-5 w-5 text-green-300" />
+                      {t.find}
+                    </span>
+                    <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                  </a>
+                </>
+              ) : isAuthenticated && isDriver ? (
+                /* 2. DRIVER USER */
+                isEligibleDriver ? (
+                  <>
+                    <Link
+                      to="/Drivers"
+                      className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[250px]"
+                    >
+                      <span className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+                          <UserRound className="h-5 w-5" />
+                        </span>
+                        Driver Dashboard
+                      </span>
+                      <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                    </Link>
 
-                <span className="flex items-center gap-3">
+                    <a
+                      href="#services"
+                      className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[240px]"
+                    >
+                      <span className="flex items-center gap-3">
+                        <Tractor className="h-5 w-5 text-green-300" />
+                        {t.find}
+                      </span>
+                      <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <a
+                      href="#services"
+                      className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[290px]"
+                    >
+                      <span className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+                          <Tractor className="h-5 w-5" />
+                        </span>
+                        {t.find}
+                      </span>
+                      <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                    </a>
 
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-                    <Tractor className="h-5 w-5" />
-                  </span>
+                    <Link
+                      to="/driver/apply"
+                      className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[210px]"
+                    >
+                      <span className="flex items-center gap-3">
+                        <UserRound className="h-5 w-5 text-green-300" />
+                        Driver Application
+                      </span>
+                      <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                    </Link>
+                  </>
+                )
+              ) : isAuthenticated ? (
+                /* 3. FARMER USER */
+                <>
+                  <a
+                    href="#services"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[290px]"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+                        <Tractor className="h-5 w-5" />
+                      </span>
+                      {t.find}
+                    </span>
+                    <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                  </a>
 
-                  {t.find}
+                  <Link
+                    to="/bookings"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[200px]"
+                  >
+                    <span className="flex items-center gap-3">
+                      <ClipboardList className="h-5 w-5 text-green-300" />
+                      My Bookings
+                    </span>
+                    <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                  </Link>
+                </>
+              ) : (
+                /* 4. GUEST / UNAUTHENTICATED */
+                <>
+                  <a
+                    href="#services"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[290px]"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+                        <Tractor className="h-5 w-5" />
+                      </span>
+                      {t.find}
+                    </span>
+                    <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                  </a>
 
-                </span>
-
-                <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-
-              </a>
-
-              {isAuthenticated ? (
-  <Link
-    to="/Drivers"
-    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[190px]"
-  >
-    <span className="flex items-center gap-3">
-      <UserRound className="h-5 w-5 text-green-300" />
-      Driver Dashboard
-    </span>
-
-    <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-  </Link>
-) : (
-  <Link
-    to="/login"
-    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[190px]"
-  >
-    <span className="flex items-center gap-3">
-      <UserRound className="h-5 w-5 text-green-300" />
-      Driver Dashboard
-    </span>
-
-    <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-  </Link>
-)}
-
+                  <Link
+                    to="/login"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[190px]"
+                  >
+                    <span className="flex items-center gap-3">
+                      <UserRound className="h-5 w-5 text-green-300" />
+                      Sign In / Register
+                    </span>
+                    <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Trust */}
@@ -892,6 +1017,7 @@ function App() {
       >
 
         <div className="mx-auto max-w-[1250px]">
+          <PromotionsBanner service="All" title="🌾 Exclusive Platform Offers & Seasonal Discounts" />
 
           <div className="mx-auto mb-12 max-w-2xl text-center">
 
@@ -1236,51 +1362,6 @@ function App() {
         </div>
 
       </section>
-
-      {/* =====================================================
-          FOOTER
-      ====================================================== */}
-
-      <footer className="border-t border-gray-200 bg-white px-5 py-8 sm:px-8 lg:px-12">
-
-        <div className="mx-auto flex max-w-[1250px] flex-col justify-between gap-5 sm:flex-row sm:items-center">
-
-          <div className="flex items-center gap-3">
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
-              <Tractor className="h-5 w-5 text-green-700" />
-            </div>
-
-            <div>
-              <p className="font-black text-[#18321f]">
-                Work<span className="text-green-700">Shetu</span>
-              </p>
-
-              <p className="text-[10px] text-gray-400">
-                {t.footer}
-              </p>
-            </div>
-
-          </div>
-
-          <button
-            onClick={() => {
-              localStorage.removeItem("workshetu-language");
-              setLanguage(null);
-            }}
-            className="flex items-center gap-2 text-xs font-semibold text-gray-400 transition hover:text-green-700"
-          >
-            <Globe2 className="h-4 w-4" />
-            Change Language
-          </button>
-
-          <p className="text-xs text-gray-400">
-            © 2026 WorkShetu
-          </p>
-
-        </div>
-
-      </footer>
 
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../UI/Navbar.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useTranslation } from "react-i18next";
@@ -8,6 +8,7 @@ function Login() {
   const { t } = useTranslation();
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [form, setForm] = useState({ phone: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,7 +23,20 @@ function Login() {
         phone: form.phone.trim(),
         password: form.password,
       });
-      navigate(user.isAdmin ? "/admin/dashboard" : user.role === "Driver" ? "/Drivers" : "/machine", { replace: true });
+      const role = String(user?.role || "").trim().toLowerCase();
+      const isAdmin = Boolean(user?.isAdmin) || role === "admin";
+      const isDriver = role === "driver";
+      const isLabour = role === "labour";
+      let defaultDest = "/machine";
+      if (isAdmin) defaultDest = "/admin/dashboard";
+      else if (isLabour) defaultDest = "/labour/dashboard";
+      else if (isDriver) defaultDest = user?.driverApplicationStatus === "Approved" ? "/Drivers" : "/driver/apply";
+      const fromPath = location.state?.from;
+      const destination = (fromPath && fromPath !== "/login" && fromPath !== "/register") ? fromPath : defaultDest;
+      navigate(destination, {
+        replace: true,
+        state: location.state?.pendingReview ? { pendingReview: location.state.pendingReview } : undefined,
+      });
     } catch (requestError) {
       if (!requestError.response) {
         setError(t("auth.connectionError", "Unable to connect to the server. Start the backend and try again."));

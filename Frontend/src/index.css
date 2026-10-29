@@ -20,6 +20,13 @@ body.dark {
   color: #e2e8f0;
 }
 
+@media (max-width: 639px) {
+  body.chatbox-open [data-floating-ai],
+  body.chatbox-open [data-floating-order] {
+    display: none !important;
+  }
+}
+
 body.dark .bg-\[\#f6f8f3\],
 body.dark .bg-\[\#f7f5ed\] {
   background-color: #0f172a;

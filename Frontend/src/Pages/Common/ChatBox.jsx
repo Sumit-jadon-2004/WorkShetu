@@ -18,7 +18,8 @@ function ChatBox({ bookingId, title, openOnMount = false, openSignal = 0, showTr
 		try {
 			if (showLoading) setLoading(true);
 			const response = await axios.get(`/api/chat/${bookingId}`, { withCredentials: true });
-			setMessages(response.data?.messages || []);
+			const nextMessages = response.data?.messages || [];
+			setMessages((current) => JSON.stringify(current) === JSON.stringify(nextMessages) ? current : nextMessages);
 			setError("");
 		} catch (requestError) {
 			setError(requestError.response?.data?.message || t("chat.loadOneError", "Chat could not be loaded."));
@@ -30,9 +31,16 @@ function ChatBox({ bookingId, title, openOnMount = false, openSignal = 0, showTr
 	useEffect(() => {
 		if (!open) return undefined;
 		loadMessages(true);
-		const timer = window.setInterval(() => loadMessages(false), 4000);
+		const timer = window.setInterval(() => {
+			if (document.visibilityState === "visible") loadMessages(false);
+		}, 10000);
 		return () => window.clearInterval(timer);
 	}, [open, bookingId]);
+
+	useEffect(() => {
+		document.body.classList.toggle("chatbox-open", open);
+		return () => document.body.classList.remove("chatbox-open");
+	}, [open]);
 
 	useEffect(() => {
 		if (openSignal > 0) setOpen(true);

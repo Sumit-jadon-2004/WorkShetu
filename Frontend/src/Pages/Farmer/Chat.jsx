@@ -5,6 +5,7 @@ import Navbar from "../UI/Navbar.jsx";
 import ChatBox from "../Common/ChatBox.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 
 function Chat() {
   const [conversations, setConversations] = useState([]);
@@ -13,6 +14,8 @@ function Chat() {
   const [error, setError] = useState("");
   const { user } = useAuth();
   const { t } = useTranslation();
+  const location = useLocation();
+  const requestedBookingId = location.state?.bookingId;
   const [openSignal, setOpenSignal] = useState(0);
 
   const loadChats = async () => {
@@ -20,11 +23,18 @@ function Chat() {
       setLoading(true);
       const endpoint = user?.role === "Driver" || user?.isAdmin ? "/api/group-bookings/owner/requests" : "/api/group-bookings/my/requests";
       const response = await axios.get(endpoint, { withCredentials: true });
-      const groups = (response.data?.groups || []).flatMap((group) => (group.status === "Accepted" ? (group.members || []).filter((member) => member.booking).map((member) => ({ id: member.booking, title: group.listing?.title || "Group machine booking", type: "Group" })) : []));
+      const canSeeGroupChats = user?.role === "Driver" || user?.isAdmin;
+      const groups = (response.data?.groups || []).flatMap((group) => (group.status === "Accepted" ? (group.members || [])
+        .filter((member) => member.booking && (canSeeGroupChats || String(member.user?._id || member.user) === String(user?._id)))
+        .map((member) => ({ id: member.booking, title: group.listing?.title || "Group machine booking", type: "Group" })) : []));
       const fast = (response.data?.bookings || []).filter((booking) => booking.status === "Accepted").map((booking) => ({ id: booking._id, title: booking.itemId?.title || "Machine booking", type: "Fast" }));
       const next = [...groups, ...fast];
       setConversations(next);
-      setSelectedId((current) => next.some((chat) => chat.id === current) ? current : next[0]?.id || "");
+      setSelectedId((current) => next.some((chat) => String(chat.id) === String(current))
+        ? current
+        : next.some((chat) => String(chat.id) === String(requestedBookingId))
+          ? requestedBookingId
+          : next[0]?.id || "");
       setError("");
     } catch (requestError) {
       setError(requestError.response?.data?.message || t("chat.loadError", "Chats could not be loaded."));
@@ -33,7 +43,7 @@ function Chat() {
     }
   };
 
-  useEffect(() => { loadChats(); }, [user?.role, user?.isAdmin]);
+  useEffect(() => { loadChats(); }, [user?.role, user?.isAdmin, requestedBookingId]);
 
   const selected = useMemo(() => conversations.find((chat) => chat.id === selectedId), [conversations, selectedId]);
 

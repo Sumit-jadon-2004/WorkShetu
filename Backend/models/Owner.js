@@ -40,7 +40,7 @@ const userSchema = new Schema(
 
         role: {
             type: String,
-            enum: ["Farmer", "Driver"],
+            enum: ["Farmer", "Driver", "Labour", "Admin", "admin"],
             default: "Farmer",
             required: true
         },
@@ -60,7 +60,8 @@ const userSchema = new Schema(
                 "None",
                 "Pending",
                 "Approved",
-                "Rejected"
+                "Rejected",
+                "Suspected"
             ],
             default: "None"
         },
@@ -73,6 +74,26 @@ const userSchema = new Schema(
             type: String,
             trim: true,
             maxlength: 500
+        },
+
+        driverSuspensionReason: {
+            type: String,
+            trim: true,
+            maxlength: 500
+        },
+
+        driverSuspendedAt: {
+            type: Date
+        },
+
+        driverReviewReason: {
+            type: String,
+            trim: true,
+            maxlength: 500
+        },
+
+        driverReviewedAt: {
+            type: Date
         },
 
         driverEquipmentImage: {
@@ -116,6 +137,34 @@ const userSchema = new Schema(
             maxlength: 1000
         },
 
+        driverAadhaarNumber: {
+            type: String,
+            trim: true,
+            maxlength: 20
+        },
+
+        driverLicenseNumber: {
+            type: String,
+            trim: true,
+            uppercase: true,
+            maxlength: 30
+        },
+
+        driverFirstListing: {
+            title: { type: String, trim: true },
+            category: { type: String, trim: true },
+            price: { type: Number },
+            unit: { type: String, trim: true },
+            power: { type: Number },
+            fuelType: { type: String, trim: true },
+            year: { type: Number },
+            vehicleNumber: { type: String, trim: true },
+            location: { type: String, trim: true },
+            latitude: { type: Number },
+            longitude: { type: Number },
+            description: { type: String, trim: true }
+        },
+
         // =========================
         // USER PROFILE
         // =========================
@@ -153,6 +202,18 @@ const userSchema = new Schema(
         isActive: {
             type: Boolean,
             default: true
+        },
+
+        bookingCredits: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+
+        freeRequestsUsed: {
+            type: Number,
+            default: 0,
+            min: 0
         }
     },
     {

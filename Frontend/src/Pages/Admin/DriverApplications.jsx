@@ -13,6 +13,8 @@ import {
     CalendarDays,
     Image as ImageIcon,
     RefreshCw,
+    CreditCard,
+    FileText,
 } from "lucide-react";
 
 
@@ -404,29 +406,30 @@ export default function DriverApplications() {
 
                                 <div className="relative h-64 bg-slate-100 dark:bg-slate-800">
 
-                                    {application.driverEquipmentImage?.url ? (
+                                    {(() => {
+                                        const imageUrl =
+                                            typeof application.driverEquipmentImage === "string"
+                                                ? application.driverEquipmentImage
+                                                : application.driverEquipmentImage?.url;
 
-                                        <img
-                                            src={
-                                                application
-                                                    .driverEquipmentImage
-                                                    .url
-                                            }
-                                            alt={`${application.fullName} equipment`}
-                                            className="h-full w-full object-cover"
-                                        />
-
-                                    ) : (
-
-                                        <div className="flex h-full items-center justify-center text-slate-400">
-
-                                            <ImageIcon
-                                                size={50}
+                                        return imageUrl ? (
+                                            <img
+                                                src={imageUrl}
+                                                alt={`${application.fullName} equipment`}
+                                                className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                                                onError={(e) => {
+                                                    e.currentTarget.onerror = null;
+                                                    e.currentTarget.src =
+                                                        "https://images.unsplash.com/photo-1592878904946-b3cd8ae243d0?auto=format&fit=crop&w=800&q=80";
+                                                }}
                                             />
-
-                                        </div>
-
-                                    )}
+                                        ) : (
+                                            <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-400">
+                                                <ImageIcon size={44} />
+                                                <span className="text-xs font-medium">No photo provided</span>
+                                            </div>
+                                        );
+                                    })()}
 
 
                                     <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-xs font-bold text-amber-700 shadow backdrop-blur">
@@ -521,6 +524,29 @@ export default function DriverApplications() {
                                             }
                                         />
 
+                                        <InfoItem
+                                            icon={
+                                                <CreditCard size={17} />
+                                            }
+                                            label="Aadhaar Number"
+                                            value={
+                                                application.driverAadhaarNumber
+                                                    ? `${application.driverAadhaarNumber.slice(0, 4)} ${application.driverAadhaarNumber.slice(4, 8)} ${application.driverAadhaarNumber.slice(8)}`
+                                                    : "Not provided"
+                                            }
+                                        />
+
+                                        <InfoItem
+                                            icon={
+                                                <FileText size={17} />
+                                            }
+                                            label="Driving Licence"
+                                            value={
+                                                application.driverLicenseNumber ||
+                                                "Not provided"
+                                            }
+                                        />
+
                                     </div>
 
 
@@ -547,6 +573,34 @@ export default function DriverApplications() {
                                         </p>
 
                                     </div>
+
+
+                                    {/* First Machine Listing Preview */}
+                                    {application.driverFirstListing && (
+                                        <div className="mt-4 rounded-2xl border border-green-200 bg-green-50/70 p-4 dark:border-green-900 dark:bg-green-950/30">
+                                            <p className="mb-2 text-xs font-black uppercase tracking-wide text-green-800 dark:text-lime-300">
+                                                🚜 First Machine Listing (Auto-publishes on Approval)
+                                            </p>
+                                            <div className="grid gap-2 text-xs sm:grid-cols-2">
+                                                <div>
+                                                    <span className="font-semibold text-slate-500">Title: </span>
+                                                    <span className="font-bold text-slate-800 dark:text-slate-100">{application.driverFirstListing.title || "N/A"}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="font-semibold text-slate-500">Rent Price: </span>
+                                                    <span className="font-bold text-green-700 dark:text-lime-300">₹{application.driverFirstListing.price || 0} / {application.driverFirstListing.unit || "Hour"}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="font-semibold text-slate-500">Category: </span>
+                                                    <span className="font-bold text-slate-800 dark:text-slate-100">{application.driverFirstListing.category || application.driverVehicleType}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="font-semibold text-slate-500">Power & Fuel: </span>
+                                                    <span className="font-bold text-slate-800 dark:text-slate-100">{application.driverFirstListing.power ? `${application.driverFirstListing.power} HP` : ""} ({application.driverFirstListing.fuelType || "Diesel"})</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
 
                                     {/* Message */}

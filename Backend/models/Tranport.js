@@ -65,7 +65,7 @@ const transportSchema = new mongoose.Schema({
 
     availability: {
         type: String,
-        enum: ["Available", "Booked"],
+        enum: ["Available", "Booked", "Hidden"],
         default: "Available"
     },
 

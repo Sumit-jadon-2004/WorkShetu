@@ -30,6 +30,15 @@ const reviewSchema = new mongoose.Schema(
             required: true,
             trim: true,
             maxlength: 500
+        },
+        status: {
+            type: String,
+            enum: ["Visible", "Hidden"],
+            default: "Visible"
+        },
+        isHidden: {
+            type: Boolean,
+            default: false
         }
     },
     { timestamps: true }

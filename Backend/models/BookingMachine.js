@@ -139,6 +139,42 @@ totalPrice: {
         min: 0
     },
 
+    // Offer & Promotion Details
+    offerId: {
+        type: Schema.Types.ObjectId,
+        ref: "Offer",
+        default: null
+    },
+    offerCode: {
+        type: String,
+        default: null,
+        trim: true
+    },
+    offerTitle: {
+        type: String,
+        default: null
+    },
+    offerDiscount: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    driverPayout: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    platformPromoExpense: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    fundingSource: {
+        type: String,
+        enum: ["WorkShetu", "Driver", "Shared"],
+        default: "WorkShetu"
+    },
+
     // Transport Booking Details
     goodsType: {
     type: String,
@@ -169,14 +205,37 @@ totalPrice: {
 },
 
     // Labour Booking Details
-    
-
     daysRequired: {
-    type: Number,
-    required: function () {
-        return this.requestType === "Labour";
-    }
-},
+        type: Number,
+        default: 1,
+        min: 1
+    },
+
+    workerCount: {
+        type: Number,
+        default: 1,
+        min: 1
+    },
+
+    taskCategory: {
+        type: String,
+        default: ""
+    },
+
+    taskDescription: {
+        type: String,
+        default: ""
+    },
+
+    unitPrice: {
+        type: Number,
+        default: 0
+    },
+
+    pricingUnit: {
+        type: String,
+        default: "per day"
+    },
 
     message: {
         type: String,
@@ -187,6 +246,32 @@ totalPrice: {
         type: Date,
         default: Date.now,
         required : true
+    },
+
+    preferredTime: {
+        type: String,
+        default: ""
+    },
+
+    responseDeadline: {
+        type: Date,
+        default: null
+    },
+
+    isInstantBooking: {
+        type: Boolean,
+        default: false
+    },
+
+    originalBookingId: {
+        type: Schema.Types.ObjectId,
+        ref: "Booking",
+        default: null
+    },
+
+    cancellationReason: {
+        type: String,
+        default: ""
     },
 
     earning: {
@@ -206,12 +291,28 @@ totalPrice: {
             "Accepted",
             "Rejected",
             "Completed",
-            "Cancelled"
+            "Cancelled",
+            "Expired"
         ],
         default: "Pending"
     },
 
     completedAt: {
+        type: Date,
+        default: null
+    },
+
+    statusChangedAt: {
+        type: Date,
+        default: null
+    },
+
+    purgeAt: {
+        type: Date,
+        default: null
+    },
+
+    historyExpiresAt: {
         type: Date,
         default: null
     },
@@ -236,5 +337,7 @@ totalPrice: {
 });
 
 bookingSchema.index({ completedAt: 1 }, { expireAfterSeconds: 15 * 24 * 60 * 60, sparse: true });
+bookingSchema.index({ historyExpiresAt: 1 }, { expireAfterSeconds: 0, sparse: true });
+bookingSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, sparse: true });
 
 module.exports = mongoose.model("Booking", bookingSchema);

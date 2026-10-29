@@ -1,55 +1,92 @@
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
-import { Check, ChevronDown, ClipboardList, Globe2 } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Check,
+  ChevronDown,
+  ClipboardList,
+  LayoutDashboard,
+  Moon,
+  ShieldCheck,
+  Sun,
+  Globe2,
+  MapPin,
+  Navigation,
+  SlidersHorizontal,
+  ArrowUpDown,
+  Search,
+  X,
+  Zap,
+  Phone,
+  MessageCircle,
+  AlertCircle
+} from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
-
-/*
-const NEARBY_RADIUS_KM = 50;
+import { useTheme } from "../../context/ThemeContext.jsx";
+import PromotionsBanner from "../Common/PromotionsBanner.jsx";
 
 const distanceInKilometers = (firstPoint, secondPoint) => {
+  if (!firstPoint?.latitude || !firstPoint?.longitude || !secondPoint?.latitude || !secondPoint?.longitude) {
+    return null;
+  }
   const earthRadiusKm = 6371;
-  const latitudeDelta = (secondPoint.latitude - firstPoint.latitude) * Math.PI / 180;
-  const longitudeDelta = (secondPoint.longitude - firstPoint.longitude) * Math.PI / 180;
-  const firstLatitude = firstPoint.latitude * Math.PI / 180;
-  const secondLatitude = secondPoint.latitude * Math.PI / 180;
-  const haversine = Math.sin(latitudeDelta / 2) ** 2
-    + Math.sin(longitudeDelta / 2) ** 2 * Math.cos(firstLatitude) * Math.cos(secondLatitude);
+  const latitudeDelta = ((secondPoint.latitude - firstPoint.latitude) * Math.PI) / 180;
+  const longitudeDelta = ((secondPoint.longitude - firstPoint.longitude) * Math.PI) / 180;
+  const firstLatitude = (firstPoint.latitude * Math.PI) / 180;
+  const secondLatitude = (secondPoint.latitude * Math.PI) / 180;
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.sin(longitudeDelta / 2) ** 2 * Math.cos(firstLatitude) * Math.cos(secondLatitude);
 
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+  return Math.round(earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)) * 10) / 10;
 };
-*/
 
 function Machines() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const userRole = String(user?.role || "").trim().toLowerCase();
+  const isAdmin = user?.isAdmin === true || userRole === "admin";
+  const isDriver = !isAdmin && userRole === "driver";
+  const isEligibleDriver = isDriver && user?.driverApplicationStatus === "Approved" && user?.isActive !== false;
 
   const [machines, setMachines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
+  const [searchParams] = useSearchParams();
+  const urlCategory = searchParams.get("category");
+  const [category, setCategory] = useState(urlCategory || "All");
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
-  // const [userLocation, setUserLocation] = useState(null);
-  // const [locationError, setLocationError] = useState("");
-  // const [locating, setLocating] = useState(true);
+  const { darkMode, toggleDarkMode } = useTheme();
 
-  // --------------------------------------------------
-  // LANGUAGE
-  // --------------------------------------------------
+  // Location & Proximity State
+  const [userLocation, setUserLocation] = useState(() => ({
+    latitude: user?.latitude != null ? Number(user.latitude) : null,
+    longitude: user?.longitude != null ? Number(user.longitude) : null,
+    label: user?.location || ""
+  }));
+  const [locating, setLocating] = useState(false);
+  const [locationStatusMessage, setLocationStatusMessage] = useState("");
+  const [selectedDistance, setSelectedDistance] = useState("All");
+  const [priceSort, setPriceSort] = useState("none");
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
 
+  useEffect(() => {
+    if (urlCategory) {
+      setCategory(urlCategory);
+    }
+  }, [urlCategory]);
+
+  // Language setup
   const currentLanguage = i18n.language?.split("-")[0] || "en";
-
   const languageNames = {
     en: "English",
     hi: "हिन्दी",
     hinglish: "Hinglish",
   };
-
-  const selectedLanguage =
-    languageNames[currentLanguage] || currentLanguage.toUpperCase();
+  const selectedLanguage = languageNames[currentLanguage] || currentLanguage.toUpperCase();
 
   const changeLanguage = (language) => {
     localStorage.setItem("workshetu-language", language);
@@ -57,135 +94,104 @@ function Machines() {
     setLanguageMenuOpen(false);
   };
 
-  // --------------------------------------------------
-  // LOAD MACHINES
-  // --------------------------------------------------
-
+  // Load Machines
   const loadMachines = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-
       const response = await axios.get("/api/machine");
-
-      const data = Array.isArray(response.data)
-        ? response.data
-        : response.data?.machines || [];
-
+      const data = Array.isArray(response.data) ? response.data : response.data?.machines || [];
       setMachines(data);
     } catch (err) {
       console.error(err);
-
-      setError(
-        t(
-          "machines.loadError",
-          "Unable to load machines. Please try again."
-        )
-      );
+      setError(t("machines.loadError", "Unable to load machines. Please try again."));
     } finally {
       setLoading(false);
     }
   }, [t]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadMachines();
   }, [loadMachines]);
 
-  /*
-  useEffect(() => {
+  // Geolocation Detection
+  const detectLocation = () => {
     if (!navigator.geolocation) {
-      setLocationError(
-        t("machines.locationUnavailable", "Location is not available in this browser.")
-      );
-      setLocating(false);
-      return undefined;
+      setLocationStatusMessage("Geolocation is not supported by your browser.");
+      return;
     }
-
+    setLocating(true);
+    setLocationStatusMessage("Detecting your farm coordinates...");
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async ({ coords }) => {
+        const { latitude, longitude } = coords;
+        let resolvedName = "";
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=14`,
+            { headers: { "Accept-Language": "en" } }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const addr = data.address || {};
+            resolvedName = addr.village || addr.town || addr.city || addr.county || "Detected Location";
+          }
+        } catch {
+          resolvedName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        }
         setUserLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
+          latitude,
+          longitude,
+          label: resolvedName || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
         });
         setLocating(false);
+        setLocationStatusMessage(`Near Me active: ${resolvedName || "Coordinates detected"}`);
       },
       () => {
-        setLocationError(
-          t("machines.locationPermission", "Allow location access to see machines near you.")
-        );
         setLocating(false);
+        setLocationStatusMessage("Location permission denied. Enter location manually.");
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
     );
-  }, [t]);
-  */
+  };
 
-  // --------------------------------------------------
-  // CATEGORIES
-  // --------------------------------------------------
-
+  // Categories
   const categories = [
-    {
-      value: "All",
-      label: t("machines.all", "All Machines"),
-      icon: "🚜",
-    },
-    {
-      value: "Tractor",
-      label: t("machines.categories.tractor", "Tractor"),
-      icon: "🚜",
-    },
-    {
-      value: "Cultivator",
-      label: t("machines.categories.cultivator", "Cultivator"),
-      icon: "🌱",
-    },
-    {
-      value: "Rotavator",
-      label: t("machines.categories.rotavator", "Rotavator"),
-      icon: "⚙️",
-    },
-    {
-      value: "Harrow",
-      label: t("machines.categories.harrow", "Harrow"),
-      icon: "🌾",
-    },
-    {
-      value: "Harvester",
-      label: t("machines.categories.harvester", "Harvester"),
-      icon: "🌾",
-    },
+    { value: "All", label: t("machines.all", "All Machines"), icon: "🚜" },
+    { value: "Tractor", label: t("machines.categories.tractor", "Tractor"), icon: "🚜" },
+    { value: "Cultivator", label: t("machines.categories.cultivator", "Cultivator"), icon: "🌱" },
+    { value: "Rotavator", label: t("machines.categories.rotavator", "Rotavator"), icon: "⚙️" },
+    { value: "Harrow", label: t("machines.categories.harrow", "Harrow"), icon: "🌾" },
+    { value: "Harvester", label: t("machines.categories.harvester", "Harvester"), icon: "🌾" },
+    { value: "Loader", label: "Loader", icon: "🚜" },
   ];
 
   const getCategoryLabel = (value) => {
     if (!value) return "";
-
     const key = String(value).toLowerCase();
-
     return t(`machines.categories.${key}`, value);
   };
 
   const getUnitLabel = (unit) => {
     if (!unit) return t("machines.unit", "Unit");
-
-    return t(
-      `machines.units.${String(unit).toLowerCase()}`,
-      unit
-    );
+    return t(`machines.units.${String(unit).toLowerCase()}`, unit);
   };
 
-  // --------------------------------------------------
-  // FILTER
-  // --------------------------------------------------
-
+  // Filter & Sort Logic
   const filteredMachines = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return machines.filter((machine) => {
-      const matchesCategory =
-        category === "All" || machine.category === category;
-      if (!query) return matchesCategory;
+    let list = machines.filter((machine) => {
+      const matchesCategory = category === "All" || machine.category === category;
+      const matchesAvailability = !onlyAvailable || machine.availability === "Available";
+
+      let matchesDistance = true;
+      if (selectedDistance !== "All" && userLocation?.latitude && userLocation?.longitude) {
+        const dist = distanceInKilometers(userLocation, machine);
+        matchesDistance = dist !== null && dist <= Number(selectedDistance);
+      }
+
+      if (!query) return matchesCategory && matchesAvailability && matchesDistance;
 
       const searchableText = [
         machine.title,
@@ -200,837 +206,498 @@ function Machines() {
         .join(" ")
         .toLowerCase();
 
-      return matchesCategory && searchableText.includes(query);
+      return matchesCategory && matchesAvailability && matchesDistance && searchableText.includes(query);
     });
-  }, [machines, search, category]);
 
-  // --------------------------------------------------
-  // FORMAT PRICE
-  // --------------------------------------------------
-
-  const formatPrice = (price) => {
-    if (price === undefined || price === null) {
-      return "—";
+    if (priceSort === "low") {
+      list.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+    } else if (priceSort === "high") {
+      list.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+    } else if (userLocation?.latitude && userLocation?.longitude) {
+      list.sort((a, b) => {
+        const distA = distanceInKilometers(userLocation, a) ?? 99999;
+        const distB = distanceInKilometers(userLocation, b) ?? 99999;
+        return distA - distB;
+      });
     }
 
-    return new Intl.NumberFormat(
-      currentLanguage === "hi" ? "hi-IN" : "en-IN",
-      {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-      }
-    ).format(price);
-  };
+    return list;
+  }, [machines, search, category, onlyAvailable, selectedDistance, priceSort, userLocation]);
 
-  // --------------------------------------------------
-  // WHATSAPP
-  // --------------------------------------------------
+  const formatPrice = (price) => {
+    if (price === undefined || price === null) return "—";
+    return new Intl.NumberFormat(currentLanguage === "hi" ? "hi-IN" : "en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(price);
+  };
 
   const openWhatsApp = (phone, machine) => {
     if (!phone) return;
-
     const cleanPhone = String(phone).replace(/\D/g, "");
-
-    const message = encodeURIComponent(
-      `Hello, I am interested in your ${machine?.title || "machine"} on WorkShetu.`
-    );
-
-    window.open(
-      `https://wa.me/91${cleanPhone}?text=${message}`,
-      "_blank"
-    );
+    const message = encodeURIComponent(`Hello, I am interested in booking your ${machine?.title || "machine"} on WorkShetu.`);
+    window.open(`https://wa.me/91${cleanPhone}?text=${message}`, "_blank");
   };
-
-  // --------------------------------------------------
-  // VIEW DETAILS
-  // --------------------------------------------------
 
   const handleViewDetails = (machine) => {
     if (!machine?._id) return;
-
     navigate(`/machines/${machine._id}`);
   };
 
-  // --------------------------------------------------
-  // STATS
-  // --------------------------------------------------
+  const handleBookNow = (machine) => {
+    if (!machine?._id) return;
+    navigate(`/machines/${machine._id}?openBooking=true`);
+  };
 
-  const availableCount = machines.filter(
-    (machine) => machine.availability === "Available"
-  ).length;
-
-  const tractorCount = machines.filter(
-    (machine) => machine.category === "Tractor"
-  ).length;
-
-  // --------------------------------------------------
-  // UI
-  // --------------------------------------------------
+  const availableCount = machines.filter((machine) => machine.availability === "Available").length;
+  const tractorCount = machines.filter((machine) => machine.category === "Tractor").length;
 
   return (
-    <main className="min-h-screen bg-[#f6f8f3] text-slate-900">
-
+    <main className="min-h-screen bg-[#f8faf7] text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
       {/* ============================================
-          HERO
+          TOP HERO & RIDE-BOOKING SEARCH BAR
       ============================================ */}
-
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#123c27] via-[#176b3a] to-[#2d8a4e]">
-
-        {/* Background decoration */}
-
-        <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-lime-300/10 blur-3xl" />
-
-        <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6 lg:px-8 lg:pb-16 lg:pt-10">
-
-          {/* Top bar */}
-
-          <div className="mb-10 flex flex-wrap items-center justify-between gap-3">
-
+      <section className="relative overflow-hidden bg-[#123524] text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(163,230,53,0.18),transparent_50%)]" />
+        <div className="relative mx-auto max-w-7xl px-4 pb-8 pt-6 sm:px-6 lg:px-8">
+          {/* Top Bar Navigation */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-2xl backdrop-blur">
                 🚜
               </div>
-
               <div>
-                <p className="text-sm font-medium text-white/70">
-                  WorkShetu
-                </p>
-
-                <h1 className="text-lg font-bold text-white">
-                  {t("machines.title", "Farm Machinery")}
-                </h1>
+                <p className="text-xs font-bold uppercase tracking-widest text-lime-300">WorkShetu</p>
+                <h1 className="text-lg font-black text-white">{t("machines.title", "Farm Machinery")}</h1>
               </div>
             </div>
 
-            {/* Selected language */}
-
+            {/* Quick Actions */}
             <div className="ml-auto flex items-center gap-2">
-            <div className="relative">
               <button
                 type="button"
-                onClick={() => setLanguageMenuOpen((open) => !open)}
-                aria-expanded={languageMenuOpen}
-                aria-haspopup="menu"
-                className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2.5 text-xs font-bold text-white shadow-lg backdrop-blur transition hover:bg-white/20"
+                onClick={toggleDarkMode}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white shadow-lg backdrop-blur transition hover:bg-white/20"
+                aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
               >
-                <Globe2 size={16} aria-hidden="true" />
-                <span>{selectedLanguage}</span>
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform ${languageMenuOpen ? "rotate-180" : ""}`}
-                  aria-hidden="true"
-                />
-                <span className="sr-only">Language</span>
+                {darkMode ? <Sun size={17} /> : <Moon size={17} />}
               </button>
 
-              {languageMenuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 top-full z-30 mt-2 w-40 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-sm shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setLanguageMenuOpen((open) => !open)}
+                  aria-expanded={languageMenuOpen}
+                  aria-haspopup="menu"
+                  className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-bold text-white shadow-lg backdrop-blur transition hover:bg-white/20"
                 >
-                  {[
-                    ["en", "English"],
-                    ["hi", "हिन्दी"],
-                    ["hinglish", "Hinglish"],
-                  ].map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => changeLanguage(value)}
-                      className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left font-semibold text-slate-700 transition hover:bg-green-50 hover:text-green-800 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-lime-300"
-                    >
-                      {label}
-                      {currentLanguage === value && <Check size={15} />}
-                    </button>
-                  ))}
-                </div>
+                  <Globe2 size={15} />
+                  <span>{selectedLanguage}</span>
+                  <ChevronDown size={14} className={`transition-transform ${languageMenuOpen ? "rotate-180" : ""}`} />
+                </button>
+                {languageMenuOpen && (
+                  <div role="menu" className="absolute right-0 top-full z-30 mt-2 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-sm shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                    {[
+                      ["en", "English"],
+                      ["hi", "हिन्दी"],
+                      ["hinglish", "Hinglish"],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => changeLanguage(value)}
+                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-semibold text-slate-700 transition hover:bg-green-50 hover:text-green-800 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-lime-300"
+                      >
+                        {label}
+                        {currentLanguage === value && <Check size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {isAuthenticated && (
+                isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/admin/dashboard")}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-green-950 shadow-lg transition hover:bg-lime-50"
+                  >
+                    <ShieldCheck size={15} />
+                    <span>Admin</span>
+                  </button>
+                ) : isEligibleDriver ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/Drivers")}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-green-950 shadow-lg transition hover:bg-lime-50"
+                  >
+                    <LayoutDashboard size={15} />
+                    <span>{t("driver.dashboard", "Driver Dashboard")}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/bookings")}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-green-950 shadow-lg transition hover:bg-lime-50"
+                  >
+                    <ClipboardList size={15} />
+                    <span>{t("navbar.myBookings", "My Bookings")}</span>
+                  </button>
+                )
               )}
             </div>
-
-            {isAuthenticated && <button type="button" onClick={() => navigate("/bookings")} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-xs font-black text-green-900 shadow-lg transition hover:bg-lime-50"><ClipboardList size={15} /><span className="hidden sm:inline">My Bookings</span><span className="sm:hidden">Bookings</span></button>}
-
-            </div>
-
           </div>
 
-          {/* Hero content */}
-
-          <div className="max-w-3xl">
-
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur">
-              <span className="h-2 w-2 rounded-full bg-lime-300" />
-              {t(
-                "machines.heroBadge",
-                "Trusted farming equipment near you"
-              )}
+          {/* Location Selector Bar */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-lime-400 text-green-950">
+                <MapPin size={16} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-white/70">Service Area</p>
+                <p className="truncate text-xs sm:text-sm font-black text-white">
+                  {userLocation.label || user?.location || "Aligarh & Nearby Service Region"}
+                </p>
+              </div>
             </div>
 
-            <h2 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-6xl">
-              {t(
-                "machines.heroTitle",
-                "Power your farming with the right machine."
-              )}
-            </h2>
+            <button
+              type="button"
+              onClick={detectLocation}
+              disabled={locating}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-white/20 px-3 text-xs font-black text-white hover:bg-white/30 transition disabled:opacity-50"
+            >
+              <Navigation size={13} className={locating ? "animate-spin" : ""} />
+              <span>{locating ? "Detecting..." : "Near Me (GPS)"}</span>
+            </button>
+          </div>
 
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-white/75 sm:text-base sm:leading-7">
-              {t(
-                "machines.heroDescription",
-                "Find tractors, cultivators, rotavators and harvesters from local machine owners."
-              )}
+          {locationStatusMessage && (
+            <p className="mb-4 text-xs font-medium text-lime-300">
+              {locationStatusMessage}
             </p>
+          )}
 
-          </div>
-
-          {/* Stats */}
-
-          <div className="mt-8 grid max-w-2xl grid-cols-3 gap-2 sm:gap-4">
-
-            <div className="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur sm:p-4">
-              <p className="text-xl font-black text-white sm:text-2xl">
-                {machines.length}
-              </p>
-
-              <p className="mt-1 text-[11px] text-white/60 sm:text-xs">
-                {t("machines.totalMachines", "Machines")}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur sm:p-4">
-              <p className="text-xl font-black text-white sm:text-2xl">
-                {availableCount}
-              </p>
-
-              <p className="mt-1 text-[11px] text-white/60 sm:text-xs">
-                {t("machines.availableNow", "Available")}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur sm:p-4">
-              <p className="text-xl font-black text-white sm:text-2xl">
-                {tractorCount}
-              </p>
-
-              <p className="mt-1 text-[11px] text-white/60 sm:text-xs">
-                {t("machines.tractors", "Tractors")}
-              </p>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* ============================================
-          SEARCH + FILTER
-      ============================================ */}
-
-      <section className="relative z-10 mx-auto -mt-6 max-w-7xl px-4 sm:px-6 lg:px-8">
-
-        <div className="rounded-3xl border border-green-900/30 bg-[#123524] p-3 shadow-xl shadow-slate-900/20 sm:p-5">
-
-          {/* Search */}
-
+          {/* Search Bar - Rapido Style */}
           <div className="relative">
-
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg">
-              🔎
-            </span>
-
+            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/60" size={20} />
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t(
-                "machines.searchPlaceholder",
-                "Search tractor, rotavator, location..."
-              )}
-              className="h-14 w-full rounded-2xl border border-white/15 bg-white/10 pl-12 pr-4 text-sm font-semibold text-white outline-none transition placeholder:text-white/55 focus:border-lime-300 focus:bg-white/15 focus:ring-4 focus:ring-lime-300/20"
+              placeholder="Which machine do you need? (e.g. Mahindra Tractor, Rotavator, Harvester...)"
+              className="h-14 w-full rounded-2xl border border-white/20 bg-white/15 pl-12 pr-10 text-sm sm:text-base font-semibold text-white outline-none transition placeholder:text-white/60 focus:border-lime-300 focus:bg-white/20 focus:ring-4 focus:ring-lime-300/20"
             />
-
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl bg-white/15 text-sm text-white transition hover:bg-white/25"
-                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 text-white hover:bg-white/30"
               >
-                ✕
+                <X size={15} />
               </button>
             )}
-
           </div>
 
-          {/* Category chips */}
-
-          <div className="mt-3 overflow-x-auto pb-1 scrollbar-none">
-
-            <div className="flex min-w-max gap-2">
-
-              {categories.map((item) => {
-                const active = category === item.value;
-
-                return (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => setCategory(item.value)}
-                    className={`flex min-h-11 items-center gap-2 rounded-2xl px-4 text-sm font-bold transition-all ${
-                      active
-                        ? "bg-lime-300 text-green-950 shadow-lg shadow-lime-300/20"
-                        : "border border-white/15 bg-white/10 text-white hover:bg-white/20"
-                    }`}
-                  >
-                    <span>{item.icon}</span>
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-
-            </div>
-
+          {/* Category Pills */}
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {categories.map((item) => {
+              const active = category === item.value;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setCategory(item.value)}
+                  className={`flex min-h-11 shrink-0 items-center gap-2 rounded-2xl px-4 text-xs sm:text-sm font-black transition-all ${
+                    active
+                      ? "bg-lime-400 text-green-950 shadow-md shadow-lime-400/20"
+                      : "border border-white/15 bg-white/10 text-white hover:bg-white/20"
+                  }`}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </div>
-
         </div>
-
       </section>
 
       {/* ============================================
-          MACHINE LIST
+          MAIN CONTENT AREA & FILTER TOOLBAR
       ============================================ */}
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <PromotionsBanner service="Machine" title="🚜 Special Tractor & Machinery Discounts" />
 
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+        {/* Filters Toolbar */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+            <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 mr-1">
+              <SlidersHorizontal size={14} /> Filter:
+            </span>
 
-        {/* Result header */}
+            {/* Distance Filter */}
+            <select
+              value={selectedDistance}
+              onChange={(e) => setSelectedDistance(e.target.value)}
+              className="h-9 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-bold text-slate-700 outline-none hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <option value="All">Distance: Any</option>
+              <option value="10">Within 10 km</option>
+              <option value="25">Within 25 km</option>
+              <option value="50">Within 50 km</option>
+            </select>
 
-        <div className="mb-6 flex items-end justify-between gap-4">
+            {/* Price Sort */}
+            <select
+              value={priceSort}
+              onChange={(e) => setPriceSort(e.target.value)}
+              className="h-9 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-bold text-slate-700 outline-none hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <option value="none">Sort: Recommended</option>
+              <option value="low">Price: Low to High</option>
+              <option value="high">Price: High to Low</option>
+            </select>
 
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-green-700">
-              {t("machines.explore", "Explore")}
-            </p>
-
-            <h3 className="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-              {t("machines.availableMachines", "Available Machinery")}
-            </h3>
+            {/* Availability Toggle */}
+            <button
+              type="button"
+              onClick={() => setOnlyAvailable(!onlyAvailable)}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition ${
+                onlyAvailable
+                  ? "bg-green-700 text-white"
+                  : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${onlyAvailable ? "bg-lime-300" : "bg-green-500"}`} />
+              Available Now
+            </button>
           </div>
 
-          <div className="rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-500 shadow-sm ring-1 ring-slate-200">
-            {filteredMachines.length}{" "}
-            {t("machines.results", "results")}
+          <div className="text-xs font-black text-slate-500 dark:text-slate-400">
+            {filteredMachines.length} machines found
           </div>
-
         </div>
 
-        {/*
-        {locating && !loading && (
-          <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
-            {t("machines.findingNearby", "Finding machines near you...")}
-          </div>
-        )}
-
-        {!locating && locationError && (
-          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-            {locationError}
-          </div>
-        )}
-        */}
-
-        {/* =========================================
-            LOADING
-        ========================================= */}
-
+        {/* LOADING STATE */}
         {loading && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-
-            {[1, 2, 3].map((item) => (
-              <div
-                key={item}
-                className="overflow-hidden rounded-[28px] bg-white shadow-sm ring-1 ring-slate-200"
-              >
-                <div className="h-56 animate-pulse bg-slate-200" />
-
-                <div className="space-y-4 p-5">
-                  <div className="h-5 w-2/3 animate-pulse rounded bg-slate-200" />
-                  <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
-                  <div className="h-12 w-full animate-pulse rounded-2xl bg-slate-200" />
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((item) => (
+              <div key={item} className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="h-48 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+                <div className="mt-4 space-y-3">
+                  <div className="h-5 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="h-4 w-1/2 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="h-10 w-full animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
                 </div>
               </div>
             ))}
-
           </div>
         )}
 
-        {/* =========================================
-            ERROR
-        ========================================= */}
-
+        {/* ERROR STATE */}
         {!loading && error && (
-          <div className="rounded-3xl border border-red-200 bg-red-50 p-8 text-center">
-
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-2xl">
-              ⚠️
-            </div>
-
-            <h3 className="mt-4 text-lg font-black text-red-900">
-              {t("machines.somethingWrong", "Something went wrong")}
-            </h3>
-
-            <p className="mt-2 text-sm text-red-700">
-              {error}
-            </p>
-
+          <div className="rounded-3xl border border-red-200 bg-red-50 p-8 text-center dark:border-red-900 dark:bg-red-950/30">
+            <AlertCircle className="mx-auto text-red-600" size={36} />
+            <h3 className="mt-3 text-lg font-black text-red-900 dark:text-red-200">Something went wrong</h3>
+            <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error}</p>
             <button
               type="button"
               onClick={loadMachines}
-              className="mt-5 rounded-2xl bg-red-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/20 hover:bg-red-700"
+              className="mt-4 rounded-xl bg-red-600 px-5 py-2.5 text-xs font-black text-white hover:bg-red-700"
             >
-              {t("machines.retry", "Try Again")}
+              Try Again
             </button>
-
           </div>
         )}
 
-        {/* =========================================
-            EMPTY
-        ========================================= */}
-
+        {/* EMPTY STATE */}
         {!loading && !error && filteredMachines.length === 0 && (
-          <div className="rounded-[32px] border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-green-50 text-4xl">
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-green-50 text-3xl dark:bg-green-950/40">
               🚜
             </div>
-
-            <h3 className="mt-5 text-xl font-black">
-              {t(
-                "machines.noMachines",
-                "No machines found"
-              )}
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-              {t(
-                "machines.noMachinesDescription",
-                "Try another search or choose a different machine category."
-              )}
+            <h3 className="mt-4 text-xl font-black">No machines match your criteria</h3>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">
+              Try adjusting your category, expanding your distance radius, or clearing search filters.
             </p>
-
             <button
               type="button"
               onClick={() => {
                 setSearch("");
                 setCategory("All");
+                setSelectedDistance("All");
+                setOnlyAvailable(false);
               }}
-              className="mt-5 rounded-2xl bg-[#176b3a] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-green-900/20"
+              className="mt-5 rounded-xl bg-green-700 px-5 py-3 text-xs font-black text-white hover:bg-green-800"
             >
-              {t("machines.clearFilters", "Clear Filters")}
+              Clear All Filters
             </button>
-
           </div>
         )}
 
-        {/* =========================================
-            CARDS
-        ========================================= */}
-
+        {/* MACHINE CARDS GRID */}
         {!loading && !error && filteredMachines.length > 0 && (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
             {filteredMachines.map((machine) => {
-
-              const isAvailable =
-                machine.availability === "Available";
+              const isAvailable = machine.availability === "Available";
+              const distance = distanceInKilometers(userLocation, machine);
 
               return (
                 <article
                   key={machine._id}
-                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/10 sm:rounded-[28px]"
+                  className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900"
                 >
-
-                  {/* =================================
-                      IMAGE
-                  ================================= */}
-
-                  <div className="relative h-48 overflow-hidden bg-slate-100 sm:h-56">
-
-                    {machine.image?.url ? (
-                      <img
-                        src={machine.image.url}
-                        alt={machine.title || "Farm machine"}
-                        loading="lazy"
-                        className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-green-50 to-lime-50 text-7xl">
-                        🚜
-                      </div>
-                    )}
-
-                    {/* Gradient */}
-
-                    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/70 to-transparent" />
-
-                    {/* Category */}
-
-                    <div className="absolute left-4 top-4">
-
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/30 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">
-                        {getCategoryLabel(machine.category)}
-                      </span>
-
-                    </div>
-
-                    {/* Availability */}
-
-                    <div className="absolute right-4 top-4">
-
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur ${
-                          isAvailable
-                            ? "bg-green-500 text-white"
-                            : "bg-slate-800/80 text-white"
-                        }`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            isAvailable
-                              ? "bg-white"
-                              : "bg-slate-400"
-                          }`}
+                  <div>
+                    {/* Image & Overlay Badges */}
+                    <div className="relative h-48 w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
+                      {machine.image?.url ? (
+                        <img
+                          src={machine.image.url}
+                          alt={machine.title || "Farm Machine"}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                         />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-5xl">🚜</div>
+                      )}
 
-                        {isAvailable
-                          ? t(
-                              "machines.available",
-                              "Available"
-                            )
-                          : t(
-                              "machines.booked",
-                              "Booked"
-                            )}
-                      </span>
+                      {/* Category Badge */}
+                      <div className="absolute left-3 top-3">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-slate-950/70 px-3 py-1 text-xs font-bold text-white backdrop-blur-md">
+                          {getCategoryLabel(machine.category)}
+                        </span>
+                      </div>
 
+                      {/* Availability Dot */}
+                      <div className="absolute right-3 top-3">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black shadow-md backdrop-blur-md ${
+                            isAvailable
+                              ? "bg-green-600 text-white"
+                              : "bg-slate-800 text-slate-200"
+                          }`}
+                        >
+                          <span className={`h-1.5 w-1.5 rounded-full ${isAvailable ? "bg-white" : "bg-slate-400"}`} />
+                          {isAvailable ? "Available" : "Booked"}
+                        </span>
+                      </div>
+
+                      {/* Distance or Location Chip */}
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs font-bold text-white">
+                        <div className="flex items-center gap-1.5 rounded-xl bg-slate-950/70 px-2.5 py-1 backdrop-blur-md truncate max-w-[70%]">
+                          <MapPin size={12} className="shrink-0 text-lime-400" />
+                          <span className="truncate">{machine.location}</span>
+                        </div>
+                        {distance !== null && (
+                          <div className="flex items-center gap-1 rounded-xl bg-blue-600/90 px-2.5 py-1 backdrop-blur-md text-[11px]">
+                            <Navigation size={11} />
+                            <span>{distance} km</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Location */}
-
-                    {machine.location && (
-                      <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2 text-white">
-
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 backdrop-blur">
-                          📍
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-semibold text-white/70">
-                            {t(
-                              "machines.location",
-                              "Location"
-                            )}
-                          </p>
-
-                          <p className="truncate text-sm font-bold">
-                            {machine.location}
-                          </p>
-                        </div>
-
+                    {/* Card Body */}
+                    <div className="p-4 sm:p-5">
+                      {/* Verified Owner & Year */}
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          <ShieldCheck size={13} className="text-emerald-600 dark:text-emerald-400" /> Verified Owner
+                        </span>
+                        {machine.year && (
+                          <span className="font-semibold text-slate-400">{machine.year} Model</span>
+                        )}
                       </div>
-                    )}
 
+                      {/* Title */}
+                      <h3 className="mt-2 text-lg font-black tracking-tight text-slate-900 line-clamp-1 dark:text-white">
+                        {machine.title || getCategoryLabel(machine.category)}
+                      </h3>
+
+                      {/* Key Specs */}
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                        {machine.power && (
+                          <span className="rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
+                            {machine.power} HP
+                          </span>
+                        )}
+                        {machine.fuelType && (
+                          <span className="rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">
+                            {machine.fuelType}
+                          </span>
+                        )}
+                        {machine.vehicleNumber && (
+                          <span className="rounded-lg bg-slate-100 px-2 py-1 font-mono text-[11px] uppercase dark:bg-slate-800">
+                            {machine.vehicleNumber}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Transparent Price Card */}
+                      <div className="mt-4 flex items-baseline justify-between rounded-2xl bg-green-50/80 p-3.5 border border-green-200/80 dark:border-green-900 dark:bg-green-950/20">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-wider text-green-800 dark:text-green-300">
+                            Rental Price
+                          </p>
+                          <div className="flex items-baseline gap-1 mt-0.5">
+                            <span className="text-xl font-black text-green-950 dark:text-lime-300">
+                              {formatPrice(machine.price)}
+                            </span>
+                            <span className="text-xs font-bold text-green-700 dark:text-lime-400">
+                              / {getUnitLabel(machine.unit)}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-white/80 dark:bg-slate-800/80 px-2.5 py-1 rounded-lg shadow-sm">
+                          Direct Booking
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* =================================
-                      CONTENT
-                  ================================= */}
-
-                  <div className="p-4 sm:p-5">
-
-                    {/* Title */}
-
-                    <div className="flex items-start justify-between gap-3">
-
-                      <div className="min-w-0">
-
-                        <h4 className="line-clamp-2 text-lg font-black leading-tight tracking-tight text-slate-900 sm:text-xl">
-                          {machine.title ||
-                            getCategoryLabel(
-                              machine.category
-                            )}
-                        </h4>
-
-                        {machine.year && (
-                          <p className="mt-1.5 text-xs font-semibold text-slate-400">
-                            {t("machines.year", "Model Year")}{" "}
-                            {machine.year}
-                          </p>
-                        )}
-
-                      </div>
-
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-50 text-lg sm:h-10 sm:w-10 sm:rounded-2xl sm:text-xl">
-                        🚜
-                      </div>
-
-                    </div>
-
-                    {/* Vehicle */}
-
-                    {machine.vehicleNumber && (
-                      <div className="mt-4 flex items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-3">
-
-                        <span className="text-xs font-semibold text-slate-500">
-                          {t(
-                            "machines.vehicleNumber",
-                            "Vehicle Number"
-                          )}
-                        </span>
-
-                        <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-black tracking-wide text-slate-800 shadow-sm">
-                          {machine.vehicleNumber}
-                        </span>
-
-                      </div>
-                    )}
-
-                    {/* =================================
-                        SPECS
-                    ================================= */}
-
-                    {(machine.power || machine.fuelType) && (
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-
-                        {machine.power && (
-                          <div className="rounded-2xl bg-slate-50 p-3">
-
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                              {t(
-                                "machines.power",
-                                "Power"
-                              )}
-                            </p>
-
-                            <p className="mt-1 text-sm font-black text-slate-800">
-                              {machine.power} HP
-                            </p>
-
-                          </div>
-                        )}
-
-                        {machine.fuelType && (
-                          <div className="rounded-2xl bg-slate-50 p-3">
-
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                              {t(
-                                "machines.fuel",
-                                "Fuel"
-                              )}
-                            </p>
-
-                            <p className="mt-1 truncate text-sm font-black text-slate-800">
-                              {machine.fuelType}
-                            </p>
-
-                          </div>
-                        )}
-
-                      </div>
-                    )}
-
-                    {/* =================================
-                        DESCRIPTION
-                    ================================= */}
-
-                    {machine.description && (
-                      <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-500">
-                        {machine.description}
-                      </p>
-                    )}
-
-                    {/* =================================
-                        PRICE
-                    ================================= */}
-
-                    <div className="mt-4 rounded-2xl bg-gradient-to-br from-green-50 to-lime-50 p-3.5 ring-1 ring-green-100 sm:mt-5 sm:rounded-[22px] sm:p-4">
-
-                      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-green-700 dark:text-green-950">
-                        {t(
-                          "machines.rentalPrice",
-                          "Rental Price"
-                        )}
-                      </p>
-
-                      <div className="mt-1 flex items-end justify-between gap-2">
-
-                        <div>
-
-                          <span className="text-xl font-black tracking-tight text-green-900 sm:text-2xl">
-                            {formatPrice(machine.price)}
-                          </span>
-
-                          <span className="ml-1 text-xs font-semibold text-green-700">
-                            / {getUnitLabel(machine.unit)}
-                          </span>
-
-                        </div>
-
-                        <span className="text-lg">
-                          💰
-                        </span>
-
-                      </div>
-
-                    </div>
-
-                    {/* =================================
-                        ACTIONS
-                    ================================= */}
-
-                    <div className="mt-3 grid grid-cols-[1fr_auto] gap-2 sm:mt-4">
+                  {/* Action Buttons */}
+                  <div className="p-4 sm:p-5 pt-0">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleViewDetails(machine)}
+                        className="flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-3 text-xs font-black text-slate-700 hover:bg-slate-50 transition active:scale-[0.98] dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        {t("machines.viewDetails", "View Details")}
+                      </button>
 
                       <button
                         type="button"
-                        onClick={() =>
-                          handleViewDetails(machine)
-                        }
-                        className="min-h-12 rounded-2xl bg-[#176b3a] px-4 text-sm font-black text-white shadow-lg shadow-green-900/15 transition hover:bg-[#125a31] active:scale-[0.98]"
+                        onClick={() => handleBookNow(machine)}
+                        disabled={!isAvailable}
+                        className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-green-700 px-3 text-xs font-black text-white shadow-md shadow-green-900/15 hover:bg-green-800 transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {t(
-                          "machines.viewDetails",
-                          "View Details"
-                        )}
+                        <Zap size={13} />
+                        <span>Book Machine</span>
                       </button>
-
-                      {machine.phone && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openWhatsApp(
-                              machine.phone,
-                              machine
-                            )
-                          }
-                          className="flex min-h-12 w-12 items-center justify-center rounded-2xl border border-green-200 bg-green-50 text-xl transition hover:bg-green-100 active:scale-95"
-                          aria-label="Contact owner on WhatsApp"
-                          title="WhatsApp"
-                        >
-                          💬
-                        </button>
-                      )}
-
                     </div>
 
-                    {/* Trust */}
-
-                    <div className="mt-4 flex items-center justify-center gap-2 border-t border-slate-100 pt-4 text-[11px] font-semibold text-slate-400">
-
-                      <span>✓</span>
-
-                      <span>
-                        {t(
-                          "machines.farmerTrust",
-                          "Connect directly with local machine owners"
-                        )}
-                      </span>
-
-                    </div>
-
+                    {machine.phone && (
+                      <button
+                        type="button"
+                        onClick={() => openWhatsApp(machine.phone, machine)}
+                        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      >
+                        <MessageCircle size={13} />
+                        <span>Chat on WhatsApp</span>
+                      </button>
+                    )}
                   </div>
-
                 </article>
               );
             })}
-
           </div>
         )}
-
       </section>
-
-      {/* ============================================
-          BOTTOM TRUST SECTION
-      ============================================ */}
-
-      <section className="border-t border-slate-200 bg-white">
-
-        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-
-          <div className="grid gap-4 sm:grid-cols-3">
-
-            <div className="rounded-3xl bg-slate-50 p-5">
-
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-green-100 text-xl">
-                🔎
-              </div>
-
-              <h4 className="font-black">
-                {t(
-                  "machines.easySearch",
-                  "Easy to Find"
-                )}
-              </h4>
-
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                {t(
-                  "machines.easySearchDescription",
-                  "Search machinery by type, location and details."
-                )}
-              </p>
-
-            </div>
-
-            <div className="rounded-3xl bg-slate-50 p-5">
-
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-green-100 text-xl">
-                🤝
-              </div>
-
-              <h4 className="font-black">
-                {t(
-                  "machines.directContact",
-                  "Direct Connection"
-                )}
-              </h4>
-
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                {t(
-                  "machines.directContactDescription",
-                  "Connect directly with machine owners."
-                )}
-              </p>
-
-            </div>
-
-            <div className="rounded-3xl bg-slate-50 p-5">
-
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-green-100 text-xl">
-                🌾
-              </div>
-
-              <h4 className="font-black">
-                {t(
-                  "machines.farmerFirst",
-                  "Made for Farmers"
-                )}
-              </h4>
-
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                {t(
-                  "machines.farmerFirstDescription",
-                  "Simple, clear and farmer-friendly machinery marketplace."
-                )}
-              </p>
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </section>
-
     </main>
   );
 }

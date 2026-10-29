@@ -14,13 +14,20 @@ import {
   Sprout,
   ClipboardList,
   MessageCircle,
-  Plus,
+  Moon,
+  Sun,
+  Truck,
+  LayoutDashboard,
+  AlertTriangle,
+  HardHat,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useTheme } from "../../context/ThemeContext.jsx";
 
 function Navbar() {
   const { t, i18n } = useTranslation();
   const { user, isAuthenticated, logout } = useAuth();
+  const { darkMode, toggleDarkMode } = useTheme();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
@@ -52,12 +59,32 @@ function Navbar() {
       (language) => language.code === currentLanguage
     ) || languages[0];
 
-  const dashboardPath =
-    user?.isAdmin
-      ? "/admin/dashboard"
-      : user?.role === "Driver"
-        ? "/Drivers"
-        : "/machine";
+  const userRole = String(user?.role || "").trim().toLowerCase();
+  const isAdmin = Boolean(user?.isAdmin) || userRole === "admin";
+  const isDriver = !isAdmin && userRole === "driver";
+  const isLabour = !isAdmin && userRole === "labour";
+  const isEligibleDriver = isDriver && user?.driverApplicationStatus === "Approved" && user?.isActive !== false;
+  const isFarmer = isAuthenticated && !isAdmin && !isDriver && !isLabour;
+
+  const dashboardPath = isAdmin
+    ? "/admin/dashboard"
+    : isEligibleDriver
+      ? "/Drivers"
+      : isDriver
+        ? "/driver/apply"
+        : isLabour
+          ? "/labour/dashboard"
+          : "/bookings";
+
+  const dashboardLabel = isAdmin
+    ? "Admin Dashboard"
+    : isEligibleDriver
+      ? t("driver.dashboard", "Driver Dashboard")
+      : isDriver
+        ? t("driver.applicationStatus", "Driver Application")
+        : isLabour
+          ? "Labour Dashboard"
+          : t("navbar.myBookings", "My Bookings");
 
   // --------------------------------------------------
   // LANGUAGE
@@ -114,39 +141,51 @@ function Navbar() {
   // NAV ITEMS
   // --------------------------------------------------
 
-  const navItems = user?.role === "Driver"
-      ? [
-        { to: "/Drivers", label: t("driver.dashboard", "Dashboard"), icon: Home },
+  const navItems = isAdmin
+    ? [
+        { to: "/admin/dashboard", label: "Admin Dashboard", icon: LayoutDashboard },
+        { to: "/admin/bookings", label: t("navbar.platformBookings", "Platform Bookings"), icon: ClipboardList },
         { to: "/machine", label: t("navbar.machinery", "Machinery"), icon: Tractor },
-        { to: "/chat", label: t("driver.chat", "Chats"), icon: MessageCircle },
+        { to: "/services", label: t("navbar.services", "Services"), icon: Sprout },
+        { to: "/admin/complaints", label: t("navbar.complaintsSupport", "Complaints & Support"), icon: AlertTriangle },
       ]
-    : [
-        {
-          to: "/",
-          label: t("navbar.home", "Home"),
-          icon: Home,
-        },
-        {
-          to: "/machine",
-          label: t("navbar.machinery", "Machinery"),
-          icon: Tractor,
-        },
-        {
-          to: "/services",
-          label: t("navbar.services", "Services"),
-          icon: Sprout,
-        },
-        {
-          to: "/bookings",
-          label: t("navbar.bookings", "My Bookings"),
-          icon: ClipboardList,
-        },
-        {
-          to: "/chat",
-          label: t("driver.chat", "Chat"),
-          icon: MessageCircle,
-        },
-      ];
+    : isDriver
+      ? isEligibleDriver
+        ? [
+            { to: "/Drivers", label: t("driver.bookingRequests", "Booking Requests"), icon: Truck },
+            { to: "/driver/listings", label: t("driver.manageListings", "My Listings"), icon: Tractor },
+            { to: "/driver/completed", label: t("driver.completedWork", "Completed Work"), icon: ClipboardList },
+            { to: "/Labour", label: "Farm Labour", icon: UserRound },
+            { to: "/chat", label: t("driver.chat", "Chats"), icon: MessageCircle },
+          ]
+        : [
+            { to: "/driver/apply", label: t("driver.applicationStatus", "Driver Application"), icon: Truck },
+            { to: "/machine", label: t("navbar.machinery", "Machinery"), icon: Tractor },
+            { to: "/Labour", label: "Farm Labour", icon: UserRound },
+            { to: "/services", label: t("navbar.services", "Services"), icon: Sprout },
+          ]
+    : isLabour
+      ? [
+          { to: "/labour/dashboard", label: "Labour Dashboard", icon: LayoutDashboard },
+          { to: "/labour/listings", label: "My Worker Profiles", icon: HardHat },
+          { to: "/Labour", label: "Marketplace", icon: UserRound },
+          { to: "/chat", label: t("navbar.chats", "Chats"), icon: MessageCircle },
+        ]
+      : isFarmer
+        ? [
+            { to: "/", label: t("navbar.home", "Home"), icon: Home },
+            { to: "/machine", label: t("navbar.machinery", "Machinery"), icon: Tractor },
+            { to: "/Labour", label: "Farm Labour", icon: UserRound },
+            { to: "/services", label: t("navbar.services", "Services"), icon: Sprout },
+            { to: "/bookings", label: t("navbar.myBookings", "My Bookings"), icon: ClipboardList },
+            { to: "/chat", label: t("navbar.chats", "Chats"), icon: MessageCircle },
+          ]
+        : [
+            { to: "/", label: t("navbar.home", "Home"), icon: Home },
+            { to: "/machine", label: t("navbar.machinery", "Machinery"), icon: Tractor },
+            { to: "/Labour", label: "Farm Labour", icon: UserRound },
+            { to: "/services", label: t("navbar.services", "Services"), icon: Sprout },
+          ];
 
   return (
     <>
@@ -360,6 +399,16 @@ function Navbar() {
                 </div>
               )}
 
+                            {/* THEME TOGGLE */}
+              <button
+                type="button"
+                onClick={toggleDarkMode}
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-green-200 hover:text-[#176b3a] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-green-700 dark:hover:text-lime-300"
+                aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+
               {/* =================================================
                   MOBILE MENU BUTTON
               ================================================= */}
@@ -468,7 +517,7 @@ function Navbar() {
                     onClick={closeMobileMenu}
                     className="flex min-h-12 items-center justify-center rounded-2xl bg-[#123524] text-sm font-black text-white"
                   >
-                    Dashboard
+                    {dashboardLabel}
                   </Link>
 
                   <button
@@ -499,6 +548,23 @@ function Navbar() {
                   </Link>
                 </div>
               )}
+
+                            {/* Mobile Theme Toggle */}
+              <div className="mt-4 flex items-center justify-between rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-sm">{darkMode ? "🌙" : "☀️"}</span>
+                  <p className="text-xs font-black text-slate-800 dark:text-slate-200">
+                    {darkMode ? "Dark Mode" : "Light Mode"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleDarkMode}
+                  className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  {darkMode ? "Light" : "Dark"}
+                </button>
+              </div>
 
               {/* Mobile Language */}
 
@@ -531,20 +597,6 @@ function Navbar() {
                 </div>
               </div>
 
-              {/* List Machine */}
-
-              <Link
-                to="/machine/add"
-                onClick={closeMobileMenu}
-                className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-lime-100 text-sm font-black text-green-900"
-              >
-                <Plus size={18} />
-
-                {t(
-                  "navbar.listMachine",
-                  "List your machine"
-                )}
-              </Link>
             </div>
           </div>
         )}

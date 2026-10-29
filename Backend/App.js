@@ -1,4 +1,6 @@
-require("dotenv").config();
+require("dotenv").config({
+    path: require("path").join(__dirname, ".env")
+});
 
 const cors = require("cors");
 const express = require("express");
@@ -11,11 +13,24 @@ const mongoose = require("mongoose");
 const Machine =
     require("./models/ListingMachin.js");
 
+const User =
+    require("./models/Owner.js");
+
+const { isDriverEligible, getEligibleDriverIds } =
+    require("./utils/driverEligibility.js");
+
 const Review =
     require("./models/Review.js");
 
 const Booking = require("./models/BookingMachine.js");
 const GroupBooking = require("./models/GroupBooking.js");
+const {
+    GROUP_MIN_LAND_AREA,
+    GROUP_DISCOUNT_PERCENT,
+    SMALL_LAND_EXTRA_CHARGE_PER_MISSING_BIGHA,
+    HIGHER_SMALL_LAND_EXTRA_CHARGE_PER_MISSING_BIGHA,
+    HIGHER_EXTRA_CHARGE_RATE_AFTER_MISSING_BIGHA
+} = require("./utils/groupBooking.js");
 const { cloudinary } = require("./Cloudinary.js");
 
 const groupBookings =
@@ -30,8 +45,50 @@ const driverRoutes =
 const adminDriverRoutes =
     require("./routes/adminDriver.js");
 
+const adminDashboardRoutes =
+    require("./routes/adminDashboard.js");
+
+const adminUsersRoutes =
+    require("./routes/adminUsers.js");
+
+const adminListingsRoutes =
+    require("./routes/adminListings.js");
+
+const adminBookingsRoutes =
+    require("./routes/adminBookings.js");
+
+const adminReviewsRoutes =
+    require("./routes/adminReviews.js");
+
+const adminComplaintsRoutes =
+    require("./routes/adminComplaints.js");
+
+const adminAnalyticsRoutes =
+    require("./routes/adminAnalytics.js");
+
+const adminSettingsRoutes =
+    require("./routes/adminSettings.js");
+
+const adminOffersRoutes =
+    require("./routes/adminOffers.js");
+
+const publicOffersRoutes =
+    require("./routes/publicOffers.js");
+
 const chatRoutes =
     require("./routes/chat.js");
+
+const aiRoutes =
+    require("./routes/aiAssistant.js");
+
+const creditsRoutes =
+    require("./routes/credits.js");
+
+const labourRoutes =
+    require("./routes/labour.js");
+
+const adminLabourRoutes =
+    require("./routes/adminLabour.js");
 
 const { upload } =
     require("./middleware/upload.js");
@@ -118,25 +175,32 @@ app.use(
 // SESSION
 // ======================================================
 
+const sessionStore = MongoStore.create({
+    mongoUrl: process.env.MONGO_URL,
+    dbName: "workshetu",
+    collectionName: "sessions"
+});
+
+// A request can finish after logout (or after its session expires), when the
+// session document has already been removed. Treat only that missing-document
+// touch as a no-op; real Mongo/store errors should still reach the error handler.
+const touchSession = sessionStore.touch.bind(sessionStore);
+sessionStore.touch = (sessionId, sessionData, callback) => {
+    touchSession(sessionId, sessionData, (error) => {
+        if (error?.message === "Unable to find the session to touch") {
+            return callback(null);
+        }
+        return callback(error);
+    });
+};
+
 app.use(
     session({
 
         secret:
             sessionSecret,
 
-        store:
-            MongoStore.create({
-
-                mongoUrl:
-                    process.env.MONGO_URL,
-
-                dbName:
-                    "workshetu",
-
-                collectionName:
-                    "sessions"
-
-            }),
+        store: sessionStore,
 
         resave: false,
 
@@ -202,8 +266,83 @@ app.use(
 );
 
 app.use(
+    "/api/admin",
+    adminDashboardRoutes
+);
+
+app.use(
+    "/api/admin",
+    adminUsersRoutes
+);
+
+app.use(
+    "/api/admin",
+    adminListingsRoutes
+);
+
+app.use(
+    "/api/admin",
+    adminBookingsRoutes
+);
+
+app.use(
+    "/api/admin",
+    adminReviewsRoutes
+);
+
+app.use(
+    "/api/admin",
+    adminComplaintsRoutes
+);
+
+app.use(
+    "/api/admin",
+    adminAnalyticsRoutes
+);
+
+app.use(
+    "/api/admin",
+    adminSettingsRoutes
+);
+
+app.use(
+    "/api/admin",
+    adminOffersRoutes
+);
+
+app.use(
+    "/api/admin/labour",
+    adminLabourRoutes
+);
+
+app.use(
+    "/api/offers",
+    publicOffersRoutes
+);
+
+app.use(
     "/api/chat",
     chatRoutes
+);
+
+app.use(
+    "/api/ai",
+    aiRoutes
+);
+
+app.use(
+    "/api/credits",
+    creditsRoutes
+);
+
+app.use(
+    "/api/labour",
+    labourRoutes
+);
+
+app.use(
+    "/api/Labour",
+    labourRoutes
 );
 
 
@@ -262,9 +401,21 @@ app.get(
 
         try {
 
+            const suspendedOrSuspected = await User.find({
+                $or: [
+                    { isActive: false },
+                    { driverApplicationStatus: "Suspected" }
+                ]
+            }).select("_id");
+            const excludedOwnerIds = suspendedOrSuspected.map((u) => u._id);
+
             const machines =
                 await Machine
-                    .find()
+                    .find({
+                        owner: { $nin: excludedOwnerIds },
+                        availability: { $ne: "Hidden" }
+                    })
+                    .populate("owner", "fullName location driverApplicationStatus")
                     .sort({
                         createdAt: -1
                     });
@@ -321,7 +472,7 @@ async function connectDatabase() {
                     "workshetu",
 
                 serverSelectionTimeoutMS:
-                    5000
+                    30000
 
             }
         );
@@ -395,6 +546,9 @@ app.get(
             const machine =
                 await Machine.findById(
                     req.params.id
+                ).populate(
+                    "owner",
+                    "fullName phone email role location driverApplicationStatus profileImage driverExperience driverVehicleNumber isActive"
                 );
 
 
@@ -409,10 +563,87 @@ app.get(
 
             }
 
+            const owner = machine.owner;
+            if (machine.availability === "Hidden" || (owner && (owner.isActive === false || owner.driverApplicationStatus === "Suspected"))) {
+                return res.status(404).json({
+                    message: "This machine listing is currently unavailable.",
+                    unavailable: true
+                });
+            }
 
-            return res.json(
-                machine
-            );
+            const machineObj = machine.toObject();
+
+            // Strict Driver Phone Privacy:
+            // The Farmer must NOT see the Driver's phone number before that booking is accepted.
+            let canViewDriverPhone = false;
+            if (req.user && req.user._id) {
+                const currentUserId = String(req.user._id);
+                const isOwnerRequester = owner && String(owner._id) === currentUserId;
+                const isAdminRequester = req.user.role === "Admin" || req.user.role === "admin";
+                if (isOwnerRequester || isAdminRequester) {
+                    canViewDriverPhone = true;
+                } else {
+                    const acceptedBooking = await Booking.findOne({
+                        itemId: machine._id,
+                        customer: req.user._id,
+                        status: { $in: ["Accepted", "Completed"] }
+                    }).select("_id");
+                    if (acceptedBooking) {
+                        canViewDriverPhone = true;
+                    }
+                }
+            }
+
+            // Normalized driver & owner objects
+            let driverName = "Driver information unavailable";
+            let isVerified = false;
+            let driverLocation = machineObj.location || "";
+            let driverPhone = "";
+            let driverExperience = 0;
+            let profileImage = null;
+            let driverVehicleNumber = "";
+
+            if (owner && typeof owner === "object") {
+                const hasName = Boolean(owner.fullName && String(owner.fullName).trim());
+                if (hasName) {
+                    driverName = String(owner.fullName).trim();
+                    isVerified = owner.driverApplicationStatus === "Approved";
+                    driverLocation = owner.location || machineObj.location || "";
+                    driverPhone = canViewDriverPhone ? (owner.phone || "") : "";
+                    driverExperience = owner.driverExperience || 0;
+                    profileImage = owner.profileImage || null;
+                    driverVehicleNumber = owner.driverVehicleNumber || machineObj.vehicleNumber || "";
+                }
+            }
+
+            const driverInfo = {
+                _id: owner?._id || null,
+                fullName: driverName,
+                name: driverName,
+                phone: driverPhone,
+                canViewPhone: canViewDriverPhone,
+                location: driverLocation,
+                driverApplicationStatus: owner?.driverApplicationStatus || "None",
+                isVerified,
+                driverExperience,
+                profileImage,
+                driverVehicleNumber
+            };
+
+            machineObj.owner = driverInfo;
+            machineObj.driver = driverInfo;
+            machineObj.canViewDriverPhone = canViewDriverPhone;
+
+            return res.json({
+                ...machineObj,
+                pricingRules: {
+                    minimumLandArea: GROUP_MIN_LAND_AREA,
+                    groupDiscountPercent: GROUP_DISCOUNT_PERCENT,
+                    extraChargePerMissingBigha: SMALL_LAND_EXTRA_CHARGE_PER_MISSING_BIGHA,
+                    higherExtraChargePerMissingBigha: HIGHER_SMALL_LAND_EXTRA_CHARGE_PER_MISSING_BIGHA,
+                    higherExtraChargeAfterMissingBigha: HIGHER_EXTRA_CHARGE_RATE_AFTER_MISSING_BIGHA
+                }
+            });
 
 
         } catch (error) {
@@ -672,6 +903,13 @@ app.post(
     upload.single("image"),
     async (req, res) => {
         try {
+            if (!isDriverEligible(req.user)) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Your driver account is not approved or is currently suspended/under review."
+                });
+            }
+
             if (!req.file) {
                 return res.status(400).json({
                     success: false,
@@ -718,6 +956,13 @@ app.post(
 
 app.put("/api/machine/:id", isLoggedIn, isDriver, upload.single("image"), async (req, res) => {
     try {
+        if (!isDriverEligible(req.user)) {
+            return res.status(403).json({
+                success: false,
+                message: "Your driver account is not approved or is currently suspended/under review."
+            });
+        }
+
         const machine = await Machine.findOne({ _id: req.params.id, owner: req.user._id });
         if (!machine) return res.status(404).json({ message: "Listing not found." });
 
@@ -778,6 +1023,23 @@ app.delete("/api/machine/:id", isLoggedIn, isDriver, async (req, res) => {
     } catch (error) {
         return res.status(400).json({ message: "Listing could not be deleted." });
     }
+});
+
+
+// ======================================================
+// GLOBAL ERROR HANDLER
+// ======================================================
+
+app.use((err, req, res, next) => {
+    console.error("Unhandled error:", err);
+    if (res.headersSent) {
+        return next(err);
+    }
+    const statusCode = err.status || err.statusCode || 500;
+    return res.status(statusCode).json({
+        success: false,
+        message: err.message || "An unexpected error occurred. Please try again.",
+    });
 });
 
 

@@ -1,7 +1,46 @@
-const GROUP_MINIMUM_LAND = 5;
-const GROUP_LOCATION_RADIUS_KM = 5;
+const defaultMinimumLandArea = 5;
+const configuredMinimumLandArea = Number(process.env.GROUP_MIN_LAND_AREA);
+const GROUP_MIN_LAND_AREA = Number.isFinite(configuredMinimumLandArea) && configuredMinimumLandArea > 0
+  ? configuredMinimumLandArea
+  : defaultMinimumLandArea;
+const GROUP_MAX_DISTANCE_KM = 2;
 const GROUP_DISCOUNT_PERCENT = 10;
-const SMALL_LAND_EXTRA_CHARGE = 500;
+const SMALL_LAND_EXTRA_CHARGE_PER_MISSING_BIGHA = 100;
+const HIGHER_SMALL_LAND_EXTRA_CHARGE_PER_MISSING_BIGHA = 150;
+const HIGHER_EXTRA_CHARGE_RATE_AFTER_MISSING_BIGHA = 2;
+
+function hasValidCoordinates(point) {
+  return Number.isFinite(point?.latitude) && point.latitude >= -90 && point.latitude <= 90
+    && Number.isFinite(point?.longitude) && point.longitude >= -180 && point.longitude <= 180;
+}
+
+function isFarmerAccount(user) {
+  return user?.role === "Farmer" && user.isAdmin !== true && user.isActive !== false;
+}
+
+function isGroupLandEligible(totalLandArea) {
+  return Number.isFinite(totalLandArea) && totalLandArea >= GROUP_MIN_LAND_AREA;
+}
+
+function groupStatusForLand(totalLandArea) {
+  return isGroupLandEligible(totalLandArea) ? "RequestSent" : "Forming";
+}
+
+function groupHasMember(group, userId) {
+  return (group?.members || []).some((member) => String(member.user?._id || member.user) === String(userId));
+}
+
+function groupHasOnlyVerifiedFarmerMembers(group, users) {
+  if (!Array.isArray(group?.members) || group.members.length === 0 || group.locationVerified !== true || !hasValidCoordinates(group)) return false;
+  const byId = new Map((users || []).map((user) => [String(user._id), user]));
+  return group.members.every((member) => {
+    const id = String(member.user?._id || member.user || "");
+    return member.locationVerified === true
+      && hasValidCoordinates(member)
+      && getDistanceKm(group, member) <= GROUP_MAX_DISTANCE_KM
+      && isFarmerAccount(byId.get(id));
+  });
+}
 
 function getDistanceKm(first, second) {
   if (![first?.latitude, first?.longitude, second?.latitude, second?.longitude].every(Number.isFinite)) {
@@ -20,16 +59,31 @@ function getDistanceKm(first, second) {
 }
 
 function isRelatedLocation(group, member) {
-  if (group.latitude != null && group.longitude != null && member.latitude != null && member.longitude != null) {
-    return getDistanceKm(group, member) <= GROUP_LOCATION_RADIUS_KM;
-  }
-
-  return group.location.trim().toLowerCase() === member.location.trim().toLowerCase();
+  return hasValidCoordinates(group) && hasValidCoordinates(member)
+    && getDistanceKm(group, member) <= GROUP_MAX_DISTANCE_KM;
 }
 
-function getSinglePrice(basePrice, landArea) {
-  const extraCharge = landArea < GROUP_MINIMUM_LAND ? SMALL_LAND_EXTRA_CHARGE : 0;
-  return { basePrice, extraCharge, discountPercent: 0, discountAmount: 0, originalPrice: basePrice + extraCharge, finalPrice: basePrice + extraCharge };
+function getSmallLandExtraCharge(landArea) {
+  const missingLandArea = Math.max(0, GROUP_MIN_LAND_AREA - landArea);
+  if (missingLandArea === 0) return 0;
+
+  const firstRateArea = Math.min(missingLandArea, HIGHER_EXTRA_CHARGE_RATE_AFTER_MISSING_BIGHA);
+  const higherRateArea = Math.max(0, missingLandArea - HIGHER_EXTRA_CHARGE_RATE_AFTER_MISSING_BIGHA);
+  return Math.round(
+    firstRateArea * SMALL_LAND_EXTRA_CHARGE_PER_MISSING_BIGHA
+      + higherRateArea * HIGHER_SMALL_LAND_EXTRA_CHARGE_PER_MISSING_BIGHA
+  );
+}
+
+function getSinglePrice(pricePerBigha, landArea) {
+  const basePrice = pricePerBigha * landArea;
+  const extraCharge = getSmallLandExtraCharge(landArea);
+  return { pricePerBigha, basePrice, extraCharge, discountPercent: 0, discountAmount: 0, originalPrice: basePrice + extraCharge, finalPrice: basePrice + extraCharge };
+}
+
+function getGroupMemberPrice(pricePerBigha, landArea) {
+  const basePrice = pricePerBigha * landArea;
+  return { pricePerBigha, basePrice, extraCharge: 0, discountPercent: 0, discountAmount: 0, originalPrice: basePrice, finalPrice: basePrice };
 }
 
 function recalculateGroup(group) {
@@ -53,11 +107,22 @@ function recalculateGroup(group) {
 }
 
 module.exports = {
-  GROUP_MINIMUM_LAND,
-  GROUP_LOCATION_RADIUS_KM,
+  GROUP_MIN_LAND_AREA,
+  GROUP_MAX_DISTANCE_KM,
   GROUP_DISCOUNT_PERCENT,
+  SMALL_LAND_EXTRA_CHARGE_PER_MISSING_BIGHA,
+  HIGHER_SMALL_LAND_EXTRA_CHARGE_PER_MISSING_BIGHA,
+  HIGHER_EXTRA_CHARGE_RATE_AFTER_MISSING_BIGHA,
+  groupHasMember,
+  groupHasOnlyVerifiedFarmerMembers,
+  groupStatusForLand,
+  hasValidCoordinates,
+  isFarmerAccount,
+  isGroupLandEligible,
   getDistanceKm,
   getSinglePrice,
+  getGroupMemberPrice,
+  getSmallLandExtraCharge,
   isRelatedLocation,
   recalculateGroup
 };

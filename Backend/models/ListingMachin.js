@@ -21,7 +21,8 @@ const machineSchema = new Schema({
             "Cultivator",
             "Rotavator",
             "Harrow",
-            "Harvester"
+            "Harvester",
+            "Loader"
         ],
         required: true,
     },
@@ -118,7 +119,7 @@ const machineSchema = new Schema({
 
     availability: {
         type: String,
-        enum: ["Available", "Booked"],
+        enum: ["Available", "Booked", "Hidden"],
         default: "Available"
     },
 
@@ -126,7 +127,39 @@ const machineSchema = new Schema({
         type: Date,
         default: Date.now
     }
-
 });
 
-module.exports = mongoose.model("Machine", machineSchema);
+machineSchema.statics.getSupportedCategories = function () {
+    return [...this.schema.path("category").enumValues];
+};
+
+machineSchema.statics.getAvailableCategoriesFromDB = async function () {
+    const { getEligibleDriverIds } = require("../utils/driverEligibility.js");
+    const eligibleDriverIds = await getEligibleDriverIds();
+    const rawCategories = await this.distinct("category", {
+        owner: { $in: eligibleDriverIds },
+        availability: { $ne: "Hidden" },
+    });
+
+    const categoryMap = new Map();
+    for (const cat of rawCategories) {
+        if (typeof cat !== "string") continue;
+        const trimmed = cat.trim();
+        if (!trimmed) continue;
+        const lower = trimmed.toLowerCase();
+        if (!categoryMap.has(lower)) {
+            categoryMap.set(lower, trimmed);
+        }
+    }
+    return Array.from(categoryMap.values()).sort((a, b) => a.localeCompare(b));
+};
+
+const Machine = mongoose.models.Machine || mongoose.model("Machine", machineSchema);
+Machine.getSupportedCategories = function () {
+    return [...machineSchema.path("category").enumValues];
+};
+Machine.getAvailableCategoriesFromDB = function () {
+    return Machine.schema.statics.getAvailableCategoriesFromDB.call(Machine);
+};
+
+module.exports = Machine;

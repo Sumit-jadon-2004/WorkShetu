@@ -12,7 +12,7 @@ function safeUser(user) {
         phone: user.phone,
         email: user.email,
         role: user.role,
-        isAdmin: user.isAdmin === true,
+        isAdmin: user.isAdmin === true || String(user.role || "").toLowerCase() === "admin",
 
         // Driver Application
         driverApplicationStatus: user.driverApplicationStatus,
@@ -24,6 +24,12 @@ function safeUser(user) {
         driverExperience: user.driverExperience,
         driverAddress: user.driverAddress,
         driverMessage: user.driverMessage,
+        driverAadhaarNumber: user.driverAadhaarNumber,
+        driverLicenseNumber: user.driverLicenseNumber,
+        driverSuspensionReason: user.driverSuspensionReason,
+        driverSuspendedAt: user.driverSuspendedAt,
+        driverReviewReason: user.driverReviewReason,
+        driverReviewedAt: user.driverReviewedAt,
 
         // Profile
         profileImage: user.profileImage,
@@ -77,17 +83,56 @@ function isLoggedIn(req, res, next) {
 // ==========================================
 
 function roleRequired(role) {
-
     return (req, res, next) => {
-
-        if (
-            !req.user ||
-            req.user.role !== role
-        ) {
+        if (!req.user) {
             return res.status(403).json({
                 success: false,
-                message:
-                    "You are not authorized to perform this action."
+                message: "You are not authorized to perform this action."
+            });
+        }
+
+        const userRole = String(req.user.role || "").trim().toLowerCase();
+        const targetRole = String(role || "").trim().toLowerCase();
+
+        if (targetRole === "admin") {
+            const isUserAdmin = req.user.isAdmin === true || userRole === "admin";
+            if (!isUserAdmin) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You are not authorized to perform this action."
+                });
+            }
+            return next();
+        }
+
+        if (targetRole === "driver") {
+            const isUserAdmin = req.user.isAdmin === true || userRole === "admin";
+            if (isUserAdmin) return next();
+            if (userRole === "driver" && req.user.driverApplicationStatus === "Approved" && req.user.isActive !== false) {
+                return next();
+            }
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to perform this action."
+            });
+        }
+
+        if (targetRole === "labour") {
+            const isUserAdmin = req.user.isAdmin === true || userRole === "admin";
+            if (isUserAdmin) return next();
+            if (userRole === "labour" && req.user.isActive !== false) {
+                return next();
+            }
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to perform this action."
+            });
+        }
+
+        if (userRole !== targetRole) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to perform this action."
             });
         }
 
@@ -96,10 +141,31 @@ function roleRequired(role) {
 }
 
 function adminRequired(req, res, next) {
-    if (!req.user || req.user.isAdmin !== true) {
+    if (
+        !req.isAuthenticated ||
+        !req.isAuthenticated() ||
+        !req.user
+    ) {
+        return res.status(401).json({
+            success: false,
+            message: "Login required."
+        });
+    }
+
+    if (req.user.isActive === false) {
+        return res.status(401).json({
+            success: false,
+            message: "Your account has been disabled. Please contact support."
+        });
+    }
+
+    const role = String(req.user.role || "").toLowerCase();
+    const isUserAdmin = role === "admin" || req.user.isAdmin === true;
+
+    if (!isUserAdmin) {
         return res.status(403).json({
             success: false,
-            message: "You are not authorized to perform this action."
+            message: "Admin access denied."
         });
     }
 
@@ -112,17 +178,11 @@ function adminRequired(req, res, next) {
 // ==========================================
 
 module.exports = {
-
     safeUser,
-
     isLoggedIn,
-
-    isFarmer:
-        roleRequired("Farmer"),
-
-    isDriver:
-        roleRequired("Driver"),
-
-    isAdmin:
-        adminRequired
+    roleRequired,
+    isFarmer: roleRequired("Farmer"),
+    isDriver: roleRequired("Driver"),
+    isLabour: roleRequired("Labour"),
+    isAdmin: adminRequired
 };
