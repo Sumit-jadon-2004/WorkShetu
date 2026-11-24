@@ -240,6 +240,14 @@ function App() {
                             }
                         />
                         <Route
+                            path="/work"
+                            element={
+                                <ProtectedRoute>
+                                    <RoleSelection />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
                             path="/work-with-workshetu"
                             element={
                                 <ProtectedRoute>

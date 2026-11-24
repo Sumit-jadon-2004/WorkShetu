@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   ArrowRight,
+  Briefcase,
   Check,
   ClipboardList,
   UserRound,
@@ -47,7 +48,7 @@ const languages = {
     heroTitle: "अब और आसान।",
     heroText:
       "मशीन चाहिए, मजदूर चाहिए या फसल के लिए Transport — अपने आसपास की सुविधा खोजें और सीधे बात करें।",
-    find: "मशीन / मजदूर खोजें",
+    find: "मशीन खोजें",
     worker: "Sign In",
     location: "अपने गांव के आसपास",
     searchTitle: "आपको क्या चाहिए?",
@@ -107,7 +108,7 @@ const languages = {
     heroTitle: "Made Easier.",
     heroText:
       "Need a machine, worker or transport? Find trusted services around your village and connect directly.",
-    find: "Find Machines / Workers",
+    find: "Find Machines",
     worker: "Sign In",
     location: "Around your village",
     searchTitle: "What do you need?",
@@ -167,7 +168,7 @@ const languages = {
     heroTitle: "Ab aur easy.",
     heroText:
       "Machine chahiye, worker chahiye ya crop ke liye transport — apne aas-paas service find karein aur directly baat karein.",
-    find: "Machine / Worker Find Karein",
+    find: "Machine Find Karein",
     worker: "SignIn",
     location: "Apne gaon ke aas-paas",
     searchTitle: "Aapko kya chahiye?",
@@ -1069,7 +1070,7 @@ function App() {
               {t.heroText}
             </p>
 
-            {/* Buttons */}
+              {/* Buttons */}
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               {/* 1. ADMIN USER */}
               {isAuthenticated && isAdmin ? (
@@ -1087,9 +1088,8 @@ function App() {
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
                   </Link>
 
-                  <button
-                    type="button"
-                    onClick={handleFindServices}
+                  <Link
+                    to="/machine"
                     className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[240px]"
                   >
                     <span className="flex items-center gap-3">
@@ -1097,7 +1097,7 @@ function App() {
                       {t.find}
                     </span>
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                  </button>
+                  </Link>
                 </>
               ) : isAuthenticated && isLabour ? (
                 <>
@@ -1114,9 +1114,8 @@ function App() {
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
                   </Link>
 
-                  <button
-                    type="button"
-                    onClick={handleFindServices}
+                  <Link
+                    to="/machine"
                     className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[240px]"
                   >
                     <span className="flex items-center gap-3">
@@ -1124,7 +1123,7 @@ function App() {
                       {t.find}
                     </span>
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                  </button>
+                  </Link>
                 </>
               ) : isAuthenticated && isDriver ? (
                 /* 2. DRIVER USER */
@@ -1143,9 +1142,8 @@ function App() {
                       <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
                     </Link>
 
-                    <button
-                      type="button"
-                      onClick={handleFindServices}
+                    <Link
+                      to="/machine"
                       className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[240px]"
                     >
                       <span className="flex items-center gap-3">
@@ -1153,60 +1151,58 @@ function App() {
                         {t.find}
                       </span>
                       <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                    </button>
+                    </Link>
                   </>
                 ) : (
                   <>
-                    <button
-                      type="button"
-                      onClick={handleFindServices}
-                      className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[290px]"
+                    <Link
+                      to="/work"
+                      className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-6 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[200px]"
                     >
                       <span className="flex items-center gap-3">
                         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-                          <Tractor className="h-5 w-5" />
+                          <Briefcase className="h-5 w-5" />
                         </span>
-                        {t.find}
+                        Work
                       </span>
                       <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                    </button>
+                    </Link>
 
                     <Link
-                      to="/driver/apply"
-                      className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[210px]"
+                      to="/machine"
+                      className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-6 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[200px]"
                     >
                       <span className="flex items-center gap-3">
-                        <UserRound className="h-5 w-5 text-green-300" />
-                        Driver Application
+                        <Tractor className="h-5 w-5 text-green-300" />
+                        {t.find}
                       </span>
                       <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
                     </Link>
                   </>
                 )
               ) : isAuthenticated ? (
-                /* 3. FARMER USER */
+                /* 3. FARMER / NORMAL AUTHENTICATED USER */
                 <>
-                  <button
-                    type="button"
-                    onClick={handleFindServices}
-                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[290px]"
+                  <Link
+                    to="/work"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-6 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[200px]"
                   >
                     <span className="flex items-center gap-3">
                       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-                        <Tractor className="h-5 w-5" />
+                        <Briefcase className="h-5 w-5" />
                       </span>
-                      {t.find}
+                      Work
                     </span>
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                  </button>
+                  </Link>
 
                   <Link
-                    to="/bookings"
-                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[200px]"
+                    to="/machine"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-6 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[200px]"
                   >
                     <span className="flex items-center gap-3">
-                      <ClipboardList className="h-5 w-5 text-green-300" />
-                      My Bookings
+                      <Tractor className="h-5 w-5 text-green-300" />
+                      {t.find}
                     </span>
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
                   </Link>
@@ -1214,27 +1210,26 @@ function App() {
               ) : (
                 /* 4. GUEST / UNAUTHENTICATED */
                 <>
-                  <button
-                    type="button"
-                    onClick={handleFindServices}
-                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[290px]"
+                  <Link
+                    to="/work"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-6 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[200px]"
                   >
                     <span className="flex items-center gap-3">
                       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-                        <Tractor className="h-5 w-5" />
+                        <Briefcase className="h-5 w-5" />
                       </span>
-                      {t.find}
+                      Work
                     </span>
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                  </button>
+                  </Link>
 
                   <Link
-                    to="/login"
-                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[190px]"
+                    to="/machine"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-6 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[200px]"
                   >
                     <span className="flex items-center gap-3">
-                      <UserRound className="h-5 w-5 text-green-300" />
-                      Sign In / Register
+                      <Tractor className="h-5 w-5 text-green-300" />
+                      {t.find}
                     </span>
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
                   </Link>
