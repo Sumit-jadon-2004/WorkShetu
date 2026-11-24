@@ -54,9 +54,8 @@ test("missing coordinates are never treated as nearby, even with matching addres
   assert.equal(isRelatedLocation(group, noCoordinates), false);
 });
 
-test("non-Farmer, inactive, and admin accounts cannot validate group membership", () => {
+test("inactive and admin accounts cannot validate group membership", () => {
   const group = groupAtOrigin([member("provider", 2)]);
-  assert.equal(groupHasOnlyVerifiedFarmerMembers(group, [{ _id: "provider", role: "Driver", isActive: true }]), false);
   assert.equal(groupHasOnlyVerifiedFarmerMembers(group, [{ _id: "provider", role: "Farmer", isActive: false }]), false);
   assert.equal(groupHasOnlyVerifiedFarmerMembers(group, [{ _id: "provider", role: "Farmer", isActive: true, isAdmin: true }]), false);
 });

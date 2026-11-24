@@ -144,14 +144,23 @@ function requireUser(req, res, next) {
 
 const requireFarmer = [isLoggedIn];
 const requireCustomer = [isLoggedIn];
-const requireOwner = [isLoggedIn, (req, res, next) => {
+const requireOwner = [isLoggedIn, async (req, res, next) => {
   const role = String(req.user.role || "").trim().toLowerCase();
   const isAdmin = req.user.isAdmin === true || role === "admin";
   if (isAdmin) return next();
-  if (role === "driver" && req.user.driverApplicationStatus === "Approved" && req.user.isActive !== false) {
+  if ((role === "driver" || req.user.driverApplicationStatus === "Approved") && req.user.isActive !== false) {
     return next();
   }
-  return res.status(403).json({ success: false, message: "Only approved active drivers or admins can manage group requests." });
+  // Check if user owns any listed machine or has listings
+  try {
+    const hasMachine = await Machine.exists({ owner: req.user._id });
+    if (hasMachine && req.user.isActive !== false) {
+      return next();
+    }
+  } catch (err) {
+    console.error("requireOwner machine check error:", err);
+  }
+  return res.status(403).json({ success: false, message: "Only approved active drivers or machine owners can manage group requests." });
 }];
 
 function validateMachineInput(body) {
@@ -667,7 +676,7 @@ router.put("/my/group/:id/cancel", [...requireFarmer, requireUser], async (req, 
 });
 
 router.get("/owner/list", [...requireOwner, requireUser], async (req, res) => {
-  const groups = await GroupBooking.find({ owner: req.customerId, status: { $ne: "Forming" } }).sort({ createdAt: -1 }).populate("members.user", "fullName phone").populate("listing", "title price unit");
+  const groups = await GroupBooking.find({ owner: req.customerId }).sort({ createdAt: -1 }).populate("members.user", "fullName phone").populate("listing", "title price unit");
   return res.json(groups.map((group) => {
     const data = group.toObject();
     if (data.status !== "Accepted") {
@@ -684,7 +693,7 @@ router.get("/owner/requests", [...requireOwner, requireUser], async (req, res) =
   await expireOverdueBookings({ owner: req.customerId });
   const now = new Date();
   const [groups, bookings, rejectedHistory] = await Promise.all([
-    GroupBooking.find({ owner: req.customerId, status: { $nin: ["Forming", "Rejected", "Cancelled", "Completed", "Expired"] } })
+    GroupBooking.find({ owner: req.customerId, status: { $nin: ["Rejected", "Cancelled", "Completed", "Expired"] } })
       .sort({ createdAt: -1 })
       .populate("members.user", "fullName phone")
       .populate("listing", "title price unit"),
@@ -788,9 +797,9 @@ async function ownerAction(req, res, status) {
   if (group.status === "Completed") {
     return res.status(409).json({ message: "This group booking has already been completed." });
   }
-  if (!["RequestSent", "Ready", "Accepted"].includes(group.status) && status !== "Cancelled") return res.status(409).json({ message: "This group is not ready for that action." });
-  if (status === "Accepted" && (!isGroupLandEligible(group.totalLandArea) || group.totalLandArea < group.minimumRequiredLand)) {
-    return res.status(409).json({ message: "This group has not reached the minimum verified Farmer land required for acceptance." });
+  if (!["Forming", "RequestSent", "Ready", "Accepted"].includes(group.status) && status !== "Cancelled") return res.status(409).json({ message: "This group is not ready for that action." });
+  if (status === "Accepted" && group.totalLandArea <= 0) {
+    return res.status(409).json({ message: "This group has no verified land area for acceptance." });
   }
   if (status === "Completed") {
     if (!group.members.length || group.members.some((member) => member.otpVerified !== true)) {

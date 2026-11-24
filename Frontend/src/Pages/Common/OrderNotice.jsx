@@ -43,9 +43,7 @@ function OrderNotice() {
           const activeBooking = (res.data?.bookings || []).find(
             (b) => b.status === "Pending" || b.status === "Accepted"
           );
-          const groupStatuses = isDriver
-            ? ["RequestSent", "Accepted"]
-            : ["Forming", "Ready", "RequestSent", "Accepted"];
+          const groupStatuses = ["Forming", "Ready", "RequestSent", "Accepted"];
           const activeGroup = (res.data?.groups || []).find((g) =>
             groupStatuses.includes(g.status)
           );

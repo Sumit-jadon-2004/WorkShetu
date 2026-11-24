@@ -166,12 +166,16 @@ function DriverDashboard() {
   }, [loadRequests]);
 
   // Audio chimes when active pending requests need attention
-  const urgentRequests = fastBookings.filter(
+  const urgentFastRequests = fastBookings.filter(
     (booking) =>
       booking.status === "Pending" &&
       (!booking.responseDeadline ||
         new Date(booking.responseDeadline).getTime() > currentTime)
   );
+  const urgentGroupRequests = groups.filter(
+    (group) => group.status === "RequestSent" || group.status === "Forming"
+  );
+  const urgentRequests = [...urgentFastRequests, ...urgentGroupRequests];
   const hasUrgentRequests = urgentRequests.length > 0;
 
   useEffect(() => {
@@ -307,7 +311,7 @@ function DriverDashboard() {
       new Date(b.responseDeadline).getTime() <= currentTime);
 
   const requestCount =
-    groups.filter((group) => group.status === "RequestSent").length +
+    groups.filter((group) => group.status === "RequestSent" || group.status === "Forming" || group.status === "Ready").length +
     fastBookings.filter((booking) => booking.status === "Pending" && !isBookingExpired(booking)).length;
   const acceptedCount =
     groups.filter((group) => group.status === "Accepted").length +
@@ -963,7 +967,7 @@ function DriverDashboard() {
                     );
                   })}
                 </div>
-                {group.status === "RequestSent" && (
+                {(group.status === "RequestSent" || group.status === "Ready" || group.status === "Forming") && (
                   <div className="mt-5 grid grid-cols-2 gap-2">
                     <button
                       type="button"

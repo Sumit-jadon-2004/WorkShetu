@@ -130,6 +130,8 @@
     "status": {
       "Pending": "Pending",
       "RequestSent": "Request bheji gayi",
+      "Forming": "Group ban raha hai",
+      "Ready": "Ready for Driver",
       "Accepted": "Accept ho gayi",
       "Completed": "Complete ho gaya",
       "Rejected": "Reject ho gayi",

@@ -149,6 +149,8 @@
     "status": {
       "Pending": "Pending",
       "RequestSent": "Request sent",
+      "Forming": "Forming (Pooled)",
+      "Ready": "Ready for Driver",
       "Accepted": "Accepted",
       "Completed": "Completed",
       "Rejected": "Rejected",
