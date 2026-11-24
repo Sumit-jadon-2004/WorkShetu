@@ -47,6 +47,7 @@ const EXTENDED_CATEGORIES = [
 ];
 
 const PRICING_UNITS = ["per day", "per hour", "per acre", "per bigha"];
+const AVAILABILITY_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export default function ManageLabourListings() {
   const { t } = useTranslation();
@@ -64,16 +65,26 @@ export default function ManageLabourListings() {
   const [form, setForm] = useState({
     name: "",
     labourType: "General Agricultural Labour",
+    subProfession: "",
     skills: "",
+    qualification: "",
     price: "",
     pricingUnit: "per day",
     experience: 1,
     location: user?.location || "",
     serviceArea: "",
+    serviceLocation: user?.location || "",
+    serviceRadiusKm: 25,
+    availabilityDays: AVAILABILITY_DAYS,
+    emergencyAvailability: false,
     phone: user?.phone || "",
     description: "",
     bookingInstructions: "Book at least 24 hours in advance.",
     availability: "Available",
+    latitude: "",
+    longitude: "",
+    mapVisibilityConsent: false,
+    publicLocation: "",
   });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -109,16 +120,26 @@ export default function ManageLabourListings() {
     setForm({
       name: user?.fullName || "",
       labourType: "General Agricultural Labour",
+      subProfession: "",
       skills: "",
+      qualification: "",
       price: "",
       pricingUnit: "per day",
       experience: 1,
       location: user?.location || "",
       serviceArea: "",
+      serviceLocation: user?.location || "",
+      serviceRadiusKm: 25,
+      availabilityDays: AVAILABILITY_DAYS,
+      emergencyAvailability: false,
       phone: user?.phone || "",
       description: "",
       bookingInstructions: "Book at least 24 hours in advance. Provide clear farm location.",
       availability: "Available",
+      latitude: "",
+      longitude: "",
+      mapVisibilityConsent: false,
+      publicLocation: "",
     });
     setIsModalOpen(true);
   };
@@ -130,16 +151,28 @@ export default function ManageLabourListings() {
     setForm({
       name: item.name || "",
       labourType: item.labourType || "General Agricultural Labour",
+      subProfession: item.subProfession || "",
       skills: Array.isArray(item.skills) ? item.skills.join(", ") : (item.skills || ""),
+      qualification: item.qualification || "",
       price: item.price ?? "",
       pricingUnit: item.pricingUnit || "per day",
       experience: item.experience ?? 0,
       location: item.location || "",
       serviceArea: item.serviceArea || "",
+      serviceLocation: item.serviceLocation || item.location || "",
+      serviceRadiusKm: item.serviceRadiusKm ?? 25,
+      availabilityDays: Array.isArray(item.availabilityDays) && item.availabilityDays.length
+        ? item.availabilityDays
+        : AVAILABILITY_DAYS,
+      emergencyAvailability: Boolean(item.emergencyAvailability),
       phone: item.phone || "",
       description: item.description || "",
       bookingInstructions: item.bookingInstructions || "",
       availability: item.availability || "Available",
+      latitude: item.latitude ?? "",
+      longitude: item.longitude ?? "",
+      mapVisibilityConsent: Boolean(item.mapVisibilityConsent),
+      publicLocation: item.publicLocation || item.serviceLocation || item.location || "",
     });
     setIsModalOpen(true);
   };
@@ -154,16 +187,26 @@ export default function ManageLabourListings() {
       const formData = new FormData();
       formData.append("name", form.name);
       formData.append("labourType", form.labourType);
+      formData.append("subProfession", form.subProfession);
       formData.append("skills", form.skills);
+      formData.append("qualification", form.qualification);
       formData.append("price", form.price);
       formData.append("pricingUnit", form.pricingUnit);
       formData.append("experience", form.experience);
       formData.append("location", form.location);
       formData.append("serviceArea", form.serviceArea);
+      formData.append("serviceLocation", form.serviceLocation);
+      formData.append("serviceRadiusKm", form.serviceRadiusKm);
+      formData.append("availabilityDays", form.availabilityDays.join(","));
+      formData.append("emergencyAvailability", String(form.emergencyAvailability));
       formData.append("phone", form.phone);
       formData.append("description", form.description);
       formData.append("bookingInstructions", form.bookingInstructions);
       formData.append("availability", form.availability);
+      if (form.latitude !== "") formData.append("latitude", form.latitude);
+      if (form.longitude !== "") formData.append("longitude", form.longitude);
+      formData.append("mapVisibilityConsent", String(form.mapVisibilityConsent));
+      formData.append("publicLocation", form.publicLocation);
 
       if (imageFile) {
         formData.append("image", imageFile);
@@ -499,6 +542,27 @@ export default function ManageLabourListings() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block font-bold text-slate-700 dark:text-slate-300">
+                    Sub-profession
+                    <input
+                      value={form.subProfession}
+                      onChange={(e) => setForm({ ...form, subProfession: e.target.value })}
+                      placeholder="e.g. Brick masonry"
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-normal text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </label>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300">
+                    Qualification
+                    <input
+                      value={form.qualification}
+                      onChange={(e) => setForm({ ...form, qualification: e.target.value })}
+                      placeholder="e.g. ITI, certified technician"
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-normal text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </label>
+                </div>
+
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -618,6 +682,108 @@ export default function ManageLabourListings() {
                     </select>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block font-bold text-slate-700 dark:text-slate-300">
+                    Service location *
+                    <input
+                      required
+                      value={form.serviceLocation}
+                      onChange={(e) => setForm({ ...form, serviceLocation: e.target.value })}
+                      placeholder="e.g. Sonipat, Haryana"
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-normal text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </label>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300">
+                    Work radius (km)
+                    <input
+                      type="number"
+                      min="1"
+                      max="200"
+                      value={form.serviceRadiusKm}
+                      onChange={(e) => setForm({ ...form, serviceRadiusKm: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-normal text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </label>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+                  <label className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={form.mapVisibilityConsent}
+                      onChange={(event) => setForm({ ...form, mapVisibilityConsent: event.target.checked })}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="block font-bold text-slate-700 dark:text-slate-300">Show an approximate map location</span>
+                      <span className="mt-1 block text-xs font-normal text-slate-500">Your exact residential address stays private. Only an approximate public marker is shown.</span>
+                    </span>
+                  </label>
+                  {form.mapVisibilityConsent && (
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Public area label
+                        <input
+                          value={form.publicLocation}
+                          onChange={(event) => setForm({ ...form, publicLocation: event.target.value })}
+                          placeholder="e.g. Sonipat district"
+                          className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 font-normal dark:border-slate-700 dark:bg-slate-800"
+                        />
+                      </label>
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Approximate latitude
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={form.latitude}
+                          onChange={(event) => setForm({ ...form, latitude: event.target.value })}
+                          className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 font-normal dark:border-slate-700 dark:bg-slate-800"
+                        />
+                      </label>
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Approximate longitude
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={form.longitude}
+                          onChange={(event) => setForm({ ...form, longitude: event.target.value })}
+                          className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 font-normal dark:border-slate-700 dark:bg-slate-800"
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+
+                <fieldset>
+                  <legend className="font-bold text-slate-700 dark:text-slate-300">Available days</legend>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {AVAILABILITY_DAYS.map((day) => (
+                      <label key={day} className="rounded-lg bg-slate-100 px-2 py-1 font-normal dark:bg-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={form.availabilityDays.includes(day)}
+                          onChange={(e) => setForm({
+                            ...form,
+                            availabilityDays: e.target.checked
+                              ? [...form.availabilityDays, day]
+                              : form.availabilityDays.filter((item) => item !== day),
+                          })}
+                        />{" "}
+                        {day.slice(0, 3)}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={form.emergencyAvailability}
+                    onChange={(e) => setForm({ ...form, emergencyAvailability: e.target.checked })}
+                  />
+                  Available for emergency requests
+                </label>
 
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">

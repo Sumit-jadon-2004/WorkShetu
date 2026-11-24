@@ -7,11 +7,13 @@ import {
   CheckCircle2,
   Clock,
   HardHat,
+  KeyRound,
   MapPin,
   MessageCircle,
   Phone,
   Plus,
   RefreshCw,
+  ShieldCheck,
   TrendingUp,
   User,
   Users,
@@ -67,6 +69,86 @@ export default function LabourDashboard() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  const [selectedBookingForOtp, setSelectedBookingForOtp] = useState(null);
+  const [otpInput, setOtpInput] = useState("");
+  const [otpError, setOtpError] = useState("");
+  const [otpSuccess, setOtpSuccess] = useState("");
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [requestingOtp, setRequestingOtp] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
+
+  const openOtpModal = (booking) => {
+    setSelectedBookingForOtp(booking);
+    setOtpInput("");
+    setOtpError("");
+    setOtpSuccess("");
+  };
+
+  const closeOtpModal = () => {
+    setSelectedBookingForOtp(null);
+    setOtpInput("");
+    setOtpError("");
+    setOtpSuccess("");
+  };
+
+  const handleRequestOtp = async () => {
+    if (!selectedBookingForOtp?._id || cooldownSeconds > 0) return;
+    try {
+      setRequestingOtp(true);
+      setOtpError("");
+      const res = await axios.post(
+        `/api/labour/provider/requests/${selectedBookingForOtp._id}/request-otp`,
+        {},
+        { withCredentials: true }
+      );
+      if (res.data?.success) {
+        setOtpSuccess(res.data?.message || "OTP generated and sent to customer.");
+        setCooldownSeconds(60);
+      }
+    } catch (err) {
+      setOtpError(err.response?.data?.message || "Failed to request OTP.");
+    } finally {
+      setRequestingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e?.preventDefault();
+    if (!selectedBookingForOtp?._id) return;
+    if (!otpInput || otpInput.trim().length !== 6) {
+      setOtpError("Please enter a valid 6-digit OTP.");
+      return;
+    }
+    try {
+      setVerifyingOtp(true);
+      setOtpError("");
+      const res = await axios.post(
+        `/api/labour/provider/requests/${selectedBookingForOtp._id}/verify-otp`,
+        { otp: otpInput.trim() },
+        { withCredentials: true }
+      );
+      if (res.data?.success) {
+        setOtpSuccess("Work marked as Completed successfully!");
+        setTimeout(() => {
+          closeOtpModal();
+          fetchDashboardData();
+        }, 1200);
+      }
+    } catch (err) {
+      setOtpError(err.response?.data?.message || "Failed to verify OTP.");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
   const handleAction = async (bookingId, action) => {
     try {
       setActionLoading(`${action}-${bookingId}`);
@@ -87,6 +169,7 @@ export default function LabourDashboard() {
 
   const stats = data?.stats || {
     activeListings: 0,
+    pendingListings: 0,
     pendingRequests: 0,
     acceptedRequests: 0,
     completedCount: 0,
@@ -99,6 +182,7 @@ export default function LabourDashboard() {
     if (activeTab === "pending") return r.status === "Pending";
     if (activeTab === "accepted") return r.status === "Accepted";
     if (activeTab === "completed") return r.status === "Completed";
+    if (activeTab === "rejected") return r.status === "Rejected";
     return true;
   });
 
@@ -158,6 +242,11 @@ export default function LabourDashboard() {
 
         {/* ── KPI Metric Cards ── */}
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          {stats.pendingListings > 0 && (
+            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+              Your Labour profile is pending approval. It will remain hidden until approved.
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {/* Active Listings */}
             <div className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
@@ -270,6 +359,16 @@ export default function LabourDashboard() {
                   Completed ({stats.completedCount})
                 </button>
                 <button
+                  onClick={() => setActiveTab("rejected")}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                    activeTab === "rejected"
+                      ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
+                      : "text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  Rejected ({stats.rejectedCount})
+                </button>
+                <button
                   onClick={() => setActiveTab("all")}
                   className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
                     activeTab === "all"
@@ -356,8 +455,8 @@ export default function LabourDashboard() {
                           </p>
                         </div>
 
-                        {/* Contact Buttons */}
-                        {req.customerPhone && (
+                        {/* Contact Buttons (Customer Phone Only When Accepted or Completed) */}
+                        {["Accepted", "Completed"].includes(req.status) && req.customerPhone && (
                           <a
                             href={`tel:${req.customerPhone}`}
                             className="flex h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
@@ -392,11 +491,11 @@ export default function LabourDashboard() {
                         {req.status === "Accepted" && (
                           <button
                             type="button"
-                            onClick={() => handleAction(req._id, "complete")}
-                            disabled={actionLoading === `complete-${req._id}`}
-                            className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700"
+                            onClick={() => openOtpModal(req)}
+                            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-black text-white hover:bg-emerald-700 shadow-2xs transition active:scale-95"
                           >
-                            Mark Completed
+                            <KeyRound size={14} />
+                            Complete Work (Verify OTP)
                           </button>
                         )}
                       </div>
@@ -407,6 +506,111 @@ export default function LabourDashboard() {
             )}
           </div>
         </div>
+
+        {/* ── Secure OTP Verification Modal ── */}
+        {selectedBookingForOtp && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    <ShieldCheck size={22} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white">
+                      Work Completion OTP
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Verify client OTP to complete booking and finalize wage
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeOtpModal}
+                  className="rounded-xl p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Booking Summary */}
+              <div className="mt-4 rounded-2xl bg-slate-50 p-3.5 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 space-y-1.5 border border-slate-100 dark:border-slate-800">
+                <div className="flex justify-between">
+                  <span>Client / Farmer:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">
+                    {selectedBookingForOtp.customerName || selectedBookingForOtp.customer?.fullName || "Client"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Days Required:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">
+                    {selectedBookingForOtp.daysRequired || 1} Day(s)
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Wage:</span>
+                  <span className="font-black text-emerald-700 dark:text-emerald-300 text-sm">
+                    ₹{selectedBookingForOtp.finalPrice || selectedBookingForOtp.totalPrice || 0}
+                  </span>
+                </div>
+              </div>
+
+              {otpError && (
+                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs font-semibold text-rose-700">
+                  {otpError}
+                </div>
+              )}
+
+              {otpSuccess && (
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-xs font-semibold text-emerald-700">
+                  {otpSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handleVerifyOtp} className="mt-4">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Enter 6-Digit Completion OTP
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={otpInput}
+                  onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ""))}
+                  placeholder="• • • • • •"
+                  className="mt-1.5 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-center text-2xl font-black tracking-[0.4em] text-slate-900 shadow-2xs focus:border-emerald-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  autoFocus
+                />
+                <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  Ask the client to share the 6-digit OTP displayed on their WorkShetu booking details.
+                </p>
+
+                <div className="mt-5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRequestOtp}
+                    disabled={requestingOtp || cooldownSeconds > 0}
+                    className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    {requestingOtp
+                      ? "Requesting..."
+                      : cooldownSeconds > 0
+                      ? `Resend in ${cooldownSeconds}s`
+                      : "Request New OTP"}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={verifyingOtp || otpInput.trim().length !== 6}
+                    className="flex-1 rounded-xl bg-emerald-700 py-2.5 text-xs font-black text-white hover:bg-emerald-800 disabled:opacity-50 transition"
+                  >
+                    {verifyingOtp ? "Verifying..." : "Verify & Complete"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </main>
     </>
   );

@@ -11,6 +11,7 @@ const Complaint = require("../models/Complaint.js");
 const Review = require("../models/Review.js");
 const { getEligibleDriverIds, isDriverEligible, getDriverAccountStatus } = require("./driverEligibility.js");
 const { validateOffer, calculateFinalPrice, findBestAutomaticOffer, getSmallLandExtraCharge } = require("./pricingEngine.js");
+const { filterAndRankByLocation } = require("./locationService.js");
 
 const categories = ["Tractor", "Cultivator", "Rotavator", "Harrow", "Harvester"];
 const labourTypes = [
@@ -153,9 +154,10 @@ async function searchMachines(args = {}, user = {}, nearby = false) {
     query.$or = ["title", "description", "fuelType"].map((field) => ({ [field]: { $regex: term, $options: "i" } }));
   }
 
-  const hasSavedCoordinates = Number.isFinite(user?.latitude) && Number.isFinite(user?.longitude);
-  const point = hasSavedCoordinates ? { latitude: user.latitude, longitude: user.longitude } : null;
-  const radiusKm = Math.min(Math.max(Number(args.radiusKm) || 50, 1), 200);
+  const userLat = Number.isFinite(args.latitude) ? Number(args.latitude) : Number.isFinite(user?.latitude) ? Number(user.latitude) : null;
+  const userLon = Number.isFinite(args.longitude) ? Number(args.longitude) : Number.isFinite(user?.longitude) ? Number(user.longitude) : null;
+  const rawCity = args.location || user?.location || "";
+  const radiusKm = Math.min(Math.max(Number(args.radiusKm) || 5, 1), 200);
 
   const rows = await Machine.find(query)
     .select("title category image.url price unit power fuelType year location description availability latitude longitude createdAt")
@@ -163,10 +165,13 @@ async function searchMachines(args = {}, user = {}, nearby = false) {
     .limit(100)
     .lean();
 
-  let results = await enrichMachines(rows, point);
-  if (point && (nearby || !args.location)) {
-    results = results.filter((m) => m.distanceKm == null || m.distanceKm <= radiusKm);
-  }
+  const locationResult = filterAndRankByLocation(rows, {
+    userLocation: { latitude: userLat, longitude: userLon, city: rawCity, location: rawCity },
+    radiusKm,
+    locationField: "location"
+  });
+
+  let results = locationResult.merged;
 
   if (args.availableOn && validDate(args.availableOn)) {
     const checks = await Promise.all(results.map((m) => checkAvailability({ machineId: m._id, date: args.availableOn })));
@@ -180,9 +185,9 @@ async function searchMachines(args = {}, user = {}, nearby = false) {
     }));
   }
 
-  results.sort(args.preferLowPrice
-    ? (a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity)
-    : (a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity) || (a.price ?? Infinity) - (b.price ?? Infinity));
+  if (args.preferLowPrice) {
+    results.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+  }
 
   return results.slice(0, 12);
 }
@@ -235,7 +240,21 @@ async function searchDirectory(type, rawArgs = {}, user = {}, nearby = false) {
   const nameFields = type === "Labour" ? ["name", "description"] : ["vehicleName", "vehicleType", "capacity", "description"];
   const args = rawArgs && typeof rawArgs === "object" ? rawArgs : {};
   const query = { availability: "Available" };
-  if (allowedTypes.includes(args[typeField])) query[typeField] = args[typeField];
+  if (type === "Labour" && typeof args.labourType === "string" && args.labourType.trim()) {
+    const profession = args.labourType.trim();
+    const synonyms = profession === "Mason"
+      ? ["Mistri & Construction", "Mason", "Mistri", "Construction"]
+      : profession === "Mechanical"
+        ? ["Mechanic", "Mechanical"]
+        : profession === "Farm Worker"
+          ? ["Agricultural Labour", "General Labour", "Farm Worker", "General agricultural labour"]
+          : [profession];
+    query.$or = (query.$or || []).concat(synonyms.map((value) => ({
+      labourType: { $regex: value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" }
+    })));
+  } else if (allowedTypes.includes(args[typeField])) {
+    query[typeField] = args[typeField];
+  }
   if (Number.isFinite(args.maxPrice) && args.maxPrice >= 0) query.price = { $lte: Math.min(args.maxPrice, 100000000) };
   if (typeof args.location === "string" && args.location.trim()) {
     query.location = { $regex: args.location.trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
@@ -245,15 +264,21 @@ async function searchDirectory(type, rawArgs = {}, user = {}, nearby = false) {
     query.$or = nameFields.map((field) => ({ [field]: { $regex: term, $options: "i" } }));
   }
 
-  const hasSavedCoordinates = Number.isFinite(user?.latitude) && Number.isFinite(user?.longitude);
-  const point = hasSavedCoordinates ? { latitude: user.latitude, longitude: user.longitude } : null;
-  const radiusKm = Math.min(Math.max(Number(args.radiusKm) || 50, 1), 200);
+  const userLat = Number.isFinite(args.latitude) ? Number(args.latitude) : Number.isFinite(user?.latitude) ? Number(user.latitude) : null;
+  const userLon = Number.isFinite(args.longitude) ? Number(args.longitude) : Number.isFinite(user?.longitude) ? Number(user.longitude) : null;
+  const rawCity = args.location || user?.location || "";
+  const radiusKm = Math.min(Math.max(Number(args.radiusKm) || 5, 1), 200);
 
   const rows = await model.find(query).limit(100).lean();
-  let results = rows.map((row) => {
-    const dist = point && Number.isFinite(row.latitude) && Number.isFinite(row.longitude)
-      ? Math.round(distanceKm(point, row) * 10) / 10
-      : null;
+
+  const locationResult = filterAndRankByLocation(rows, {
+    userLocation: { latitude: userLat, longitude: userLon, city: rawCity, location: rawCity },
+    radiusKm,
+    locationField: "location",
+    isLabour: type === "Labour"
+  });
+
+  let results = locationResult.merged.map((row) => {
     if (type === "Labour") {
       return {
         _id: String(row._id),
@@ -269,7 +294,8 @@ async function searchDirectory(type, rawArgs = {}, user = {}, nearby = false) {
         experience: row.experience,
         description: row.description,
         availability: row.availability,
-        distanceKm: dist
+        distanceKm: row.distanceKm ?? null,
+        proximityLabel: row.proximityLabel || null
       };
     }
     return {
@@ -283,17 +309,14 @@ async function searchDirectory(type, rawArgs = {}, user = {}, nearby = false) {
       location: row.location,
       description: row.description,
       availability: row.availability,
-      distanceKm: dist
+      distanceKm: row.distanceKm ?? null,
+      proximityLabel: row.proximityLabel || null
     };
   });
 
-  if (point && (nearby || !args.location)) {
-    results = results.filter((s) => nearby ? s.distanceKm != null && s.distanceKm <= radiusKm : s.distanceKm == null || s.distanceKm <= radiusKm);
+  if (args.preferLowPrice) {
+    results.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
   }
-
-  results.sort(args.preferLowPrice
-    ? (a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity)
-    : (a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity) || (a.price ?? Infinity) - (b.price ?? Infinity));
 
   return results.slice(0, 12);
 }
@@ -594,6 +617,43 @@ async function requestCancelBooking(args = {}, user = {}, confirm = false, actio
     status: "Cancelled",
     message: `Booking #${bookingId} has been successfully cancelled.`
   };
+}
+
+// ==========================================
+// LABOUR PROVIDER TOOLS IMPLEMENTATION
+// ==========================================
+async function getLabourRequests(args = {}, user = {}) {
+  if (!user?._id) return { error: "User is not authenticated." };
+  const status = args.status || "All";
+  const query = { owner: user._id, requestType: "Labour" };
+  if (status !== "All") query.status = status;
+  const requests = await Booking.find(query)
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .populate("customer", "fullName phone location")
+    .populate("itemId", "name labourType")
+    .lean();
+  return {
+    requests: requests.map((booking) => ({
+      bookingId: String(booking._id),
+      status: booking.status,
+      worker: booking.itemId?.name || "Your worker profile",
+      profession: booking.itemId?.labourType,
+      customerName: booking.customerName || booking.customer?.fullName || "Customer",
+      customerLocation: booking.customerLocation,
+      requestedDate: booking.bookingDate,
+      totalPrice: booking.finalPrice || booking.totalPrice || 0,
+      message: booking.message || booking.taskDescription || ""
+    }))
+  };
+}
+
+async function getLabourProfile(user = {}) {
+  if (!user?._id) return { error: "User is not authenticated." };
+  const profiles = await Labour.find({ owner: user._id })
+    .select("name labourType subProfession experience skills location serviceLocation serviceRadiusKm price pricingUnit availability status")
+    .lean();
+  return { profiles };
 }
 
 // ==========================================
@@ -1214,7 +1274,7 @@ const toolDefinitions = {
   },
   searchLabour: {
     type: "function",
-    allowedRoles: ["Farmer", "Admin"],
+    allowedRoles: ["Farmer", "Labour", "Admin"],
     function: {
       name: "searchLabour",
       description: "Search agricultural workers and farm labour directory.",
@@ -1227,6 +1287,28 @@ const toolDefinitions = {
         },
         additionalProperties: false
       }
+    }
+  },
+  getLabourRequests: {
+    type: "function",
+    allowedRoles: ["Labour"],
+    function: {
+      name: "getLabourRequests",
+      description: "Show the authenticated labour provider's own work requests without exposing unauthorized data.",
+      parameters: {
+        type: "object",
+        properties: { status: { type: "string", enum: ["All", "Pending", "Accepted", "Rejected", "Completed"] } },
+        additionalProperties: false
+      }
+    }
+  },
+  getLabourProfile: {
+    type: "function",
+    allowedRoles: ["Labour"],
+    function: {
+      name: "getLabourProfile",
+      description: "Show the authenticated labour provider's own profiles and availability.",
+      parameters: { type: "object", properties: {}, additionalProperties: false }
     }
   },
   searchTransport: {
@@ -1520,17 +1602,23 @@ function normalizeRole(user) {
   if (String(user.role || "").trim().toLowerCase() === "driver") {
     return "Driver";
   }
+  if (String(user.role || "").trim().toLowerCase() === "labour") {
+    return "Labour";
+  }
   return "Farmer";
 }
 
 /**
  * Returns available OpenAI tools allowed for a specific user role.
  */
-function getToolsForRole(role) {
+function getToolsForRole(role, pageContext = "general") {
   const normRole = String(role || "Farmer").trim();
   const allowed = [];
   for (const def of Object.values(toolDefinitions)) {
     if (def.allowedRoles.includes(normRole)) {
+      if (pageContext === "labour" && !["searchLabour", "getLabourRequests", "getLabourProfile"].includes(def.function.name)) {
+        continue;
+      }
       allowed.push({
         type: def.type,
         function: def.function
@@ -1555,6 +1643,10 @@ async function executeTool(name, args, user, context = {}) {
     return { error: `Permission denied: Tool '${name}' is not authorized for role '${role}'.` };
   }
 
+  if (context.pageContext === "labour" && !["searchLabour", "getLabourRequests", "getLabourProfile"].includes(name)) {
+    return { error: "Permission denied: Machine and Driver tools are not available in the Labour assistant." };
+  }
+
   const confirm = Boolean(args?.confirm || context.confirm);
   const actionId = args?.actionId || context.actionId;
 
@@ -1570,6 +1662,10 @@ async function executeTool(name, args, user, context = {}) {
       return checkAvailability(args);
     case "searchLabour":
       return searchDirectory("Labour", args, user);
+    case "getLabourRequests":
+      return getLabourRequests(args, user);
+    case "getLabourProfile":
+      return getLabourProfile(user);
     case "searchTransport":
       return searchDirectory("Transport", args, user);
     case "getMyBookings":

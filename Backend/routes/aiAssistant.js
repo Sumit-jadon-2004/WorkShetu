@@ -160,6 +160,52 @@ function responseRecommendations(toolResults, language) {
       continue;
     }
 
+    // 5b. Driver / Owner listings (machines, labours, transports)
+    if (entry.name === "getMyListings" && result) {
+      if (Array.isArray(result.machines)) {
+        for (const m of result.machines) {
+          recommendations.set(`machine:${m.machineId}`, {
+            type: "machine",
+            machineId: String(m.machineId),
+            title: m.title,
+            category: m.category,
+            price: m.price,
+            location: m.location,
+            availabilityStatus: m.availability === "Available" ? "available" : "unavailable",
+            reason: result.isPubliclyVisible ? "Registered Active Machine" : "Verification Pending",
+            machine: {
+              _id: m.machineId,
+              title: m.title,
+              category: m.category,
+              price: m.price?.replace(/[^\d.]/g, "") || "0",
+              unit: "Bigha",
+              location: m.location,
+              availability: m.availability
+            }
+          });
+        }
+      }
+      if (Array.isArray(result.labours)) {
+        for (const l of result.labours) {
+          recommendations.set(`labour:${l.labourId}`, {
+            type: "labour",
+            serviceId: String(l.labourId),
+            reason: "Your Labour Profile",
+            service: {
+              _id: l.labourId,
+              name: l.name,
+              labourType: l.labourType,
+              serviceType: "Labour",
+              price: l.price?.replace(/[^\d.]/g, "") || "0",
+              pricingUnit: "per day",
+              location: l.location
+            }
+          });
+        }
+      }
+      continue;
+    }
+
     // 6. Machine, Labour, Transport listings
     const items = Array.isArray(result) ? result : result?.machine ? [result.machine] : [];
     for (const item of items) {
@@ -255,7 +301,7 @@ function localizedAuth(middleware) {
   };
 }
 
-router.post("/assistant", (req, res, next) => {
+router.post(["/assistant", "/labour"], (req, res, next) => {
   req.aiLanguage = detectAiLanguageStyle(req.body?.message);
   next();
 }, limiter, localizedAuth(isLoggedIn), async (req, res) => {
@@ -298,7 +344,9 @@ router.post("/assistant", (req, res, next) => {
   if (!process.env.GROQ_API_KEY) return res.status(503).json({ message: aiMessage("missingKey", language) });
 
   // Validate and normalize pageContext: "machines" | "labour" | "general"
-  const rawPageContext = String(req.body?.pageContext || "").trim().toLowerCase();
+  const rawPageContext = req.path === "/labour"
+    ? "labour"
+    : String(req.body?.pageContext || "").trim().toLowerCase();
   const pageContext = ["machines", "labour", "general"].includes(rawPageContext) ? rawPageContext : "general";
 
   // ML Statistical Intent Classification
@@ -314,15 +362,139 @@ router.post("/assistant", (req, res, next) => {
     ? { ...user.toObject ? user.toObject() : user, latitude: currentCoordinates.latitude, longitude: currentCoordinates.longitude }
     : user;
 
-  let intent = detectIntent(message, history, assistantUser);
+  let intent = detectIntent(message, history, assistantUser, pageContext);
 
   // If intent was general or ambiguous, enhance with ML intent and pageContext
   if (intent.type === "general" && !mlClassification.isLowConfidence) {
-    if (mlClassification.predictedIntent === "SEARCH_LABOUR" || (pageContext === "labour" && !["HOW_TO_BOOK", "TRACK_BOOKING"].includes(mlClassification.predictedIntent))) {
+    if (pageContext === "labour") {
+      const filters = serviceSearchFilters("labour", message, history);
+      intent = { type: "labour", filters };
+    } else if (mlClassification.predictedIntent === "SEARCH_LABOUR") {
       const filters = serviceSearchFilters("labour", message, history);
       intent = { type: "labour", filters };
     } else if (mlClassification.predictedIntent === "SEARCH_MACHINE" || (pageContext === "machines" && !["HOW_TO_BOOK", "TRACK_BOOKING"].includes(mlClassification.predictedIntent))) {
       intent = { type: "search", machineIds: [] };
+    }
+  }
+
+  // Deterministic Labour routing: handles Labour search across all roles (Farmer, Driver, Labour)
+  // as well as specialized worker profile/request/registration actions.
+  const labourSearchHint = /\b(?:labou?r|worker|mistri|mason|beldar|engineer|technician|mechanic|electrician|plumber|carpenter|painter|mazdoor|kheti\s+mazdoor|kheti\s+labour)\b|\u092e\u091c\u0926\u0942\u0930|\u092c\u0947\u0932\u0926\u093e\u0930|\u092e\u093f\u0938\u094d\u0924\u094d\u0930\u0940|\u0932\u0947\u092c\u0930/iu.test(message);
+  if (labourSearchHint && ![
+    "labour_profile",
+    "labour_profile_update",
+    "labour_requests",
+    "labour_registration",
+    "labour_booking"
+  ].includes(intent.type)) {
+    intent = { type: "labour", filters: serviceSearchFilters("labour", message, history) };
+  }
+
+  if (intent.type === "labour") {
+    const rawResult = await executeTool("searchLabour", intent.filters || {}, assistantUser, { pageContext: "labour", history, message });
+    const result = rawResult;
+    const toolResults = [{ name: "searchLabour", args: intent.filters || {}, result }];
+    const recommendations = responseRecommendations(toolResults, language);
+    const count = recommendations.length;
+    return res.json({
+      message: result?.error
+        ? aiMessage("requestFailed", language)
+        : count
+          ? (language === "Hindi"
+              ? `आपकी ज़रूरत के अनुसार ${count} Labour worker/profile मिले।`
+              : language === "English"
+                ? `Found ${count} matching Labour worker/profile listing(s).`
+                : `Aapki zarurat ke according ${count} matching Labour worker/profile mila/mili.`)
+          : (language === "Hindi"
+              ? "इस criteria के अनुसार कोई matching Labour worker नहीं मिला।"
+              : language === "English"
+                ? "No matching Labour worker was found for those criteria."
+                : "Is criteria ke according koi matching Labour worker nahi mila."),
+      recommendations
+    });
+  }
+
+  if (pageContext === "labour" || role === "Labour") {
+
+    if (intent.type === "labour_profile") {
+      if (role !== "Labour") {
+        return res.json({
+          message: language === "Hindi"
+            ? "Labour profile sirf is listing ke owner ko dikh sakti hai. Pehle /labour/apply se worker profile banayein."
+            : "A Labour profile is only available to the authenticated worker account. Register at /labour/apply first.",
+          recommendations: [{ type: "labour_registration", url: "/labour/apply" }]
+        });
+      }
+      const result = await executeTool("getLabourProfile", {}, assistantUser, { pageContext: "labour", history, message });
+      const profiles = Array.isArray(result?.profiles) ? result.profiles : [];
+      return res.json({
+        message: profiles.length
+          ? (language === "Hindi" ? `Aapki ${profiles.length} Labour profile mili.` : `Found ${profiles.length} Labour profile on your account.`)
+          : (language === "Hindi" ? "Aapki koi Labour profile nahi mili." : "No Labour profile was found for your account."),
+        recommendations: profiles.map((profile) => ({
+          type: "labour_profile",
+          profileId: String(profile._id || ""),
+          profile,
+          url: `/labour/listings`
+        }))
+      });
+    }
+
+    if (intent.type === "labour_profile_update") {
+      return res.json({
+        message: language === "Hindi"
+          ? "Apni listing update karne ke liye /labour/listings kholen, profile ke Edit action par jaayein aur profession, experience, skills, qualification, location, radius, charges aur availability save karein."
+          : "To update your listing, open /labour/listings, choose Edit on your profile, and save your profession, experience, skills, qualification, location, radius, charges, and availability.",
+        recommendations: [{ type: "labour_profile_update", url: "/labour/listings" }]
+      });
+    }
+
+    if (intent.type === "labour_requests") {
+      if (role !== "Labour") {
+        return res.json({
+          message: language === "Hindi"
+            ? "Work requests sirf Labour account owner dekh sakta hai."
+            : "Work requests are only available to the authenticated Labour account owner.",
+          recommendations: [{ type: "labour_registration", url: "/labour/apply" }]
+        });
+      }
+      const status = intent.status || "All";
+      const result = await executeTool("getLabourRequests", { status }, assistantUser, { pageContext: "labour", history, message });
+      const requests = Array.isArray(result?.requests) ? result.requests : [];
+      return res.json({
+        message: requests.length
+          ? (language === "Hindi"
+              ? `${status} status ki ${requests.length} work request mili.`
+              : `Found ${requests.length} ${status.toLowerCase()} work request(s).`)
+          : (language === "Hindi"
+              ? `Is account ke liye koi ${status.toLowerCase()} work request nahi mili.`
+              : `No ${status.toLowerCase()} work requests were found for this account.`),
+        recommendations: requests.map((request) => ({
+          type: "labour_request",
+          status: request.status,
+          bookingId: request.bookingId,
+          request,
+          url: "/labour/dashboard"
+        }))
+      });
+    }
+
+    if (intent.type === "labour_registration") {
+      return res.json({
+        message: language === "Hindi"
+          ? "Labour registration ke liye /labour/apply kholen. Wahan personal details, profession/sub-profession, experience, skills, qualification, work description, location/radius, charges aur availability bharni hoti hai."
+          : "For Labour registration, open /labour/apply. Complete personal details, profession/sub-profession, experience, skills, qualification, work description, location/radius, charges, and availability.",
+        recommendations: [{ type: "labour_registration", url: "/labour/apply" }]
+      });
+    }
+
+    if (intent.type === "labour_booking") {
+      return res.json({
+        message: language === "Hindi"
+          ? "Worker marketplace mein Labour profile kholen, “Book This Worker” dabayein, task location, date, duration aur workers ki number details fill karein."
+          : "Open a worker in the Labour marketplace, choose “Book This Worker,” and enter the work location, date, duration, and worker count.",
+        recommendations: [{ type: "labour", url: "/Labour" }]
+      });
     }
   }
 
@@ -351,7 +523,7 @@ router.post("/assistant", (req, res, next) => {
     }
 
     // Role-authorized tool list
-    const tools = getToolsForRole(role);
+    const tools = getToolsForRole(role, pageContext);
     const toolResults = [];
     let finalText = "";
     let modelFailed = false;

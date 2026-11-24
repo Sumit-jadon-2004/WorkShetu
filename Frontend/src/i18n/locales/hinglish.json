@@ -377,5 +377,26 @@
     "rights": "All rights reserved.",
     "farmerBottomLine": "Har booking ke saath machinery tak behtar access.",
     "driverBottomLine": "Aapka work, aapki listings—ek simple workspace."
+  },
+  "labourProfile": {
+    "ownerCannotReview": "Aap is profile ke owner hain, isliye apni service ko review nahi kar sakte.",
+    "noReviews": "Abhi koi verified review nahi hai.",
+    "editReview": "Apna review edit karein",
+    "deleteReview": "Apna review delete karein",
+    "deleteReviewConfirm": "Apna review delete karein? Ise undo nahi kiya ja sakta.",
+    "reviewUpdated": "Review update ho gaya.",
+    "reviewDeleted": "Review delete ho gaya.",
+    "reviewSaveError": "Review save nahi ho saka.",
+    "reviewDeleteError": "Review delete nahi ho saka.",
+    "saveReview": "Changes save karein",
+    "ratingLabel": "Rating choose karein",
+    "mapTitle": "Service location",
+    "locationUnavailable": "Location available nahi hai",
+    "approximateServiceArea": "Approximate service area",
+    "serviceRadius": "Service radius: {{radius}} km",
+    "useMyLocation": "Meri location use karein",
+    "privateCoordinates": "Worker ke exact coordinates private hain.",
+    "browserLocationUnsupported": "Is browser mein location access supported nahi hai.",
+    "customerLocationDenied": "Aapki location permission nahi mili."
   }
 }

@@ -1,7 +1,7 @@
 import {
+  AlertCircle,
   ArrowRight,
   Check,
-  CheckCircle2,
   ClipboardList,
   UserRound,
   ChevronRight,
@@ -14,19 +14,24 @@ import {
   Moon,
   Sun,
   Phone,
+  Radio,
+  RefreshCw,
   Search,
   ShieldCheck,
+  Sparkles,
   Tractor,
   Truck,
   Users,
   Wheat,
+  Wrench,
   X,
 } from "lucide-react";
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
-import { useEffect, useState } from "react";
+import { useUserLocation } from "../../context/LocationContext.jsx";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import PromotionsBanner from "../Common/PromotionsBanner.jsx";
 
@@ -46,6 +51,7 @@ const languages = {
     worker: "Sign In",
     location: "अपने गांव के आसपास",
     searchTitle: "आपको क्या चाहिए?",
+    searchPlaceholder: "आपको क्या चाहिए? Machine, Worker या Driver",
     searchValue: "Machine • Worker • Driver",
     search: "खोजें",
     services: "हमारी सेवाएं",
@@ -105,22 +111,23 @@ const languages = {
     worker: "Sign In",
     location: "Around your village",
     searchTitle: "What do you need?",
-    searchValue: "Machine â€¢ Worker â€¢ Driver",
+    searchPlaceholder: "What do you need? Machine, Worker or Driver",
+    searchValue: "Machine • Worker • Driver",
     search: "Search",
     services: "Our Services",
     servicesTitle: "Everything your farm needs",
     servicesText:
       "From machines to skilled workers and transport, find practical solutions around you.",
     machines: "Farm Machines",
-    machinesSub: "Tractor â€¢ Harvester â€¢ Rotavator",
+    machinesSub: "Tractor • Harvester • Rotavator",
     machinesDesc:
       "Find available farming machines near you and contact the owner directly.",
     workers: "Skilled Workers",
-    workersSub: "Sowing â€¢ Harvesting â€¢ Field Work",
+    workersSub: "Sowing • Harvesting • Field Work",
     workersDesc:
       "Connect with experienced and trusted workers from your local area.",
     transport: "Transport & Drivers",
-    transportSub: "Farm â€¢ Mandi â€¢ Delivery",
+    transportSub: "Farm • Mandi • Delivery",
     transportDesc:
       "Find nearby drivers and transport to move your harvest from farm to market.",
     view: "Explore Now",
@@ -159,27 +166,28 @@ const languages = {
     heroSmall: "Kheti ka kaam",
     heroTitle: "Ab aur easy.",
     heroText:
-      "Machine chahiye, worker chahiye ya crop ke liye transport â€” apne aas-paas service find karein aur directly baat karein.",
+      "Machine chahiye, worker chahiye ya crop ke liye transport — apne aas-paas service find karein aur directly baat karein.",
     find: "Machine / Worker Find Karein",
     worker: "SignIn",
     location: "Apne gaon ke aas-paas",
     searchTitle: "Aapko kya chahiye?",
-    searchValue: "Machine â€¢ Worker â€¢ Driver",
+    searchPlaceholder: "Aapko kya chahiye? Machine, Worker ya Driver",
+    searchValue: "Machine • Worker • Driver",
     search: "Search Karein",
     services: "Our Services",
     servicesTitle: "Kheti ke har kaam ke liye",
     servicesText:
-      "Machine, worker ya transport â€” apne area ke aas-paas solution easily find karein.",
+      "Machine, worker ya transport — apne area ke aas-paas solution easily find karein.",
     machines: "Farm Machines",
-    machinesSub: "Tractor â€¢ Harvester â€¢ Rotavator",
+    machinesSub: "Tractor • Harvester • Rotavator",
     machinesDesc:
       "Apne gaon ke aas-paas available machines find karein aur owner se directly baat karein.",
     workers: "Skilled Workers",
-    workersSub: "Bowaai â€¢ Kataai â€¢ Field Work",
+    workersSub: "Bowaai • Kataai • Field Work",
     workersDesc:
       "Apne area ke experienced aur trusted workers se directly connect karein.",
     transport: "Transport & Drivers",
-    transportSub: "Farm â€¢ Mandi â€¢ Delivery",
+    transportSub: "Farm • Mandi • Delivery",
     transportDesc:
       "Harvest ko farm se mandi tak le jaane ke liye nearby driver aur transport find karein.",
     view: "Abhi Explore Karein",
@@ -209,7 +217,41 @@ const languages = {
   },
 };
 
+const SEARCH_SUGGESTIONS = [
+  // Machines
+  { id: "m-tractor", title: "Tractor", category: "Tractor", type: "machine", hindi: "ट्रैक्टर", keywords: ["tractor", "trektor", "traktor", "ट्रैक्टर", "farms", "खेती"] },
+  { id: "m-rotavator", title: "Rotavator", category: "Rotavator", type: "machine", hindi: "रोटावेटर", keywords: ["rotavator", "rota", "rotavetor", "रोटावेटर", "जुताई"] },
+  { id: "m-cultivator", title: "Cultivator", category: "Cultivator", type: "machine", hindi: "कल्टीवेटर", keywords: ["cultivator", "kaltivator", "कल्टीवेटर"] },
+  { id: "m-harvester", title: "Harvester / Combine", category: "Harvester", type: "machine", hindi: "हार्वेस्टर / कंबाइन", keywords: ["harvester", "combine", "katai machine", "हार्वेस्टर", "कंबाइन"] },
+  { id: "m-harrow", title: "Harrow", category: "Harrow", type: "machine", hindi: "हैरो (Harrow)", keywords: ["harrow", "disco", "हैरो", "डिस्क"] },
+  { id: "m-trolley", title: "Tractor Trolley", category: "Trolley", type: "machine", hindi: "ट्रॉली", keywords: ["trolley", "trola", "ट्रॉली", "ट्रोला"] },
+  { id: "m-sprayer", title: "Sprayer / Duster", category: "Sprayer", type: "machine", hindi: "स्प्रेयर मशीन", keywords: ["sprayer", "spray machine", "dawa spray", "स्प्रेयर"] },
+  { id: "m-thresher", title: "Thresher", category: "Thresher", type: "machine", hindi: "थ्रेशर", keywords: ["thresher", "thrasher", "थ्रेशर"] },
+  { id: "m-seeddrill", title: "Seed Drill", category: "Seed Drill", type: "machine", hindi: "सीड ड्रिल / बुवाई मशीन", keywords: ["seed drill", "buwai machine", "सीड ड्रिल"] },
+  { id: "m-laser", title: "Laser Land Leveler", category: "Laser Leveler", type: "machine", hindi: "लेजर लेवलर", keywords: ["laser leveler", "leveler", "लेजर लेवलर", "कंप्यूटर मांझा"] },
+
+  // Labour / Workers
+  { id: "l-farmworker", title: "Farm Labour / Field Worker", category: "Farm Worker", type: "labour", hindi: "खेत मजदूर / लेबर", keywords: ["worker", "labour", "lebar", "khet majdoor", "majdoor", "mazdoor", "मजदूर", "लेबर", "worker"] },
+  { id: "l-harvesting", title: "Harvesting Worker (कटाई)", category: "Harvesting", type: "labour", hindi: "कटाई मजदूर", keywords: ["harvesting", "katai", "fasal katai", "कटाई"] },
+  { id: "l-sowing", title: "Sowing & Planting Worker (बुवाई)", category: "Sowing & Planting", type: "labour", hindi: "बुवाई और रोपाई मजदूर", keywords: ["sowing", "planting", "buwai", "ropai", "बुवाई", "रोपाई"] },
+  { id: "l-weeding", title: "Weeding / Nindai Worker (निराई-गुड़ाई)", category: "Weeding", type: "labour", hindi: "निराई-गुड़ाई मजदूर", keywords: ["weeding", "nindai", "gudai", "घास सफाई", "निराई"] },
+  { id: "l-loading", title: "Loading & Unloading Helper", category: "Loading & Unloading", type: "labour", hindi: "लोडिंग-अनलोडिंग मजदूर", keywords: ["loading", "unloading", "palladari", "बोरी उठाना", "लोडिंग"] },
+  { id: "l-mechanic", title: "Tractor Mechanic", category: "Tractor mechanic", type: "labour", hindi: "ट्रैक्टर मैकेनिक", keywords: ["tractor mechanic", "mechanic", "mistri", "mistry", "मैकेनिक", "मिस्त्री"] },
+  { id: "l-electrician", title: "Farm Electrician / Motor Mistry", category: "Electrician", type: "labour", hindi: "इलेक्ट्रीशियन / मोटर मिस्त्री", keywords: ["electrician", "bijli", "motor mistri", "इलेक्ट्रीशियन", "बिजली"] },
+  { id: "l-plumber", title: "Plumber / Tube-well Fitting", category: "Plumber", type: "labour", hindi: "प्लम्बर / ट्यूबवेल फिटिंग", keywords: ["plumber", "tubewell", "pipe fitting", "प्लम्बर", "नल"] },
+
+  // Drivers & Operators (Mapped under Labour in WorkShetu)
+  { id: "d-tractor", title: "Tractor Driver", category: "Tractor Driver", type: "driver", hindi: "ट्रैक्टर ड्राइवर", keywords: ["tractor driver", "driver", "chalak", "ड्राइवर", "चालक", "tractor chalak"] },
+  { id: "d-harvester", title: "Harvester Operator", category: "Harvester Operator", type: "driver", hindi: "हार्वेस्टर ऑपरेटर", keywords: ["harvester operator", "combine driver", "कंबाइन ड्राइवर", "हार्वेस्टर ऑपरेटर"] },
+  { id: "d-spray", title: "Spray Machine Operator", category: "Spray Machine Operator", type: "driver", hindi: "स्प्रे मशीन ऑपरेटर", keywords: ["spray operator", "dawa spray driver", "स्प्रे ऑपरेटर"] },
+  { id: "d-loader", title: "Loader / JCB Operator", category: "Loader Operator", type: "driver", hindi: "लोडर ऑपरेटर", keywords: ["loader operator", "jcb operator", "लोडर ऑपरेटर"] },
+
+  // Transport
+  { id: "t-transport", title: "Crop Transport / Goods Vehicle", category: "Transport", type: "transport", hindi: "फसल ट्रांसपोर्ट / मालवाहक", keywords: ["transport", "pickup", "canter", "dcm", "trolley transport", "गाड़ी", "ट्रांसपोर्ट"] },
+];
+
 function App() {
+  const navigate = useNavigate();
   const { i18n } = useTranslation();
   const [comingSoon, setComingSoon] = useState(false);
   const [language, setLanguage] = useState(null);
@@ -217,13 +259,30 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
 
+  // Shared Location Context
+  const {
+    displayName: locationDisplayName,
+    locality: locationLocality,
+    city: locationCity,
+    locationStatus,
+    errorMessage: locationErrorMessage,
+    refreshLocation,
+  } = useUserLocation();
+
+  // Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const searchContainerRef = useRef(null);
+  const searchInputRef = useRef(null);
+
   // Authentication & Role Evaluation
   const { user, isAuthenticated, logout } = useAuth();
 
   const userRole = String(user?.role || "").trim().toLowerCase();
   const isAdmin = Boolean(user?.isAdmin) || userRole === "admin";
   const isDriver = !isAdmin && userRole === "driver";
-  const isFarmer = !isAdmin && !isDriver;
+  const isLabour = !isAdmin && userRole === "labour";
   const isEligibleDriver =
     isDriver &&
     user?.driverApplicationStatus === "Approved" &&
@@ -261,6 +320,263 @@ function App() {
   };
 
   const t = language ? languages[language] : languages.hinglish;
+
+  const handleFindServices = () => {
+    document.getElementById("services")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Filter autocomplete suggestions based on user input
+  const filteredSuggestions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) {
+      return SEARCH_SUGGESTIONS.slice(0, 6);
+    }
+    return SEARCH_SUGGESTIONS.filter((item) => {
+      if (item.title.toLowerCase().includes(q)) return true;
+      if (item.category.toLowerCase().includes(q)) return true;
+      if (item.hindi && item.hindi.toLowerCase().includes(q)) return true;
+      if (
+        item.keywords &&
+        item.keywords.some((k) => k.toLowerCase().includes(q))
+      )
+        return true;
+      return false;
+    }).slice(0, 8);
+  }, [searchQuery]);
+
+  // Dynamic location label derived from GPS context
+  const locationDisplayTitle = useMemo(() => {
+    if (locationStatus === "requesting_location") {
+      return language === "hi"
+        ? "स्थान खोजा जा रहा है..."
+        : "Detecting GPS location...";
+    }
+    if (locationStatus === "permission_denied") {
+      return language === "hi"
+        ? "GPS अनुमति नहीं मिली (Tap to retry)"
+        : "GPS Denied (Tap to retry)";
+    }
+    if (locationStatus === "error") {
+      return (
+        locationErrorMessage ||
+        (language === "hi"
+          ? "स्थान त्रुटि (पुनः प्रयास करें)"
+          : "Location unavailable (Retry)")
+      );
+    }
+    if (locationLocality || locationCity || locationDisplayName) {
+      const parts = [locationLocality, locationCity].filter(Boolean);
+      return parts.length > 0 ? parts.join(", ") : locationDisplayName;
+    }
+    return t.location || "Around your village";
+  }, [
+    locationStatus,
+    locationLocality,
+    locationCity,
+    locationDisplayName,
+    locationErrorMessage,
+    language,
+    t.location,
+  ]);
+
+  const handleLocationClick = () => {
+    if (locationStatus === "requesting_location") return;
+    refreshLocation();
+  };
+
+  // Search execution handler for Machine, Labour, Driver, Transport
+  const handleExecuteSearch = (rawQuery = "", explicitItem = null) => {
+    const query = (rawQuery || searchQuery || "").trim();
+    setShowSuggestions(false);
+
+    if (explicitItem) {
+      if (explicitItem.type === "transport") {
+        setComingSoon(true);
+        return;
+      }
+      if (explicitItem.type === "driver") {
+        navigate(
+          `/Labour?category=${encodeURIComponent(explicitItem.category || "Tractor Driver")}&search=${encodeURIComponent(explicitItem.title)}`
+        );
+        return;
+      }
+      if (explicitItem.type === "labour") {
+        navigate(
+          `/Labour?category=${encodeURIComponent(explicitItem.category)}&search=${encodeURIComponent(explicitItem.title)}`
+        );
+        return;
+      }
+      // machine
+      navigate(
+        `/machine?category=${encodeURIComponent(explicitItem.category)}&search=${encodeURIComponent(explicitItem.title)}`
+      );
+      return;
+    }
+
+    if (!query) {
+      navigate("/machine");
+      return;
+    }
+
+    const lower = query.toLowerCase();
+
+    // 1. Transport check
+    const isTransport = [
+      "transport",
+      "pickup",
+      "canter",
+      "trolley transport",
+      "गाड़ी",
+      "ट्रांसपोर्ट",
+      "mandi delivery",
+    ].some((k) => lower.includes(k));
+    if (isTransport) {
+      setComingSoon(true);
+      return;
+    }
+
+    // 2. Driver check
+    const isDriverKeyword = [
+      "driver",
+      "chalak",
+      "चालक",
+      "ड्राइवर",
+      "operator",
+    ].some((k) => lower.includes(k));
+    if (isDriverKeyword) {
+      navigate(
+        `/Labour?category=Tractor%20Driver&search=${encodeURIComponent(query)}`
+      );
+      return;
+    }
+
+    // 3. Labour / Worker check
+    const isLabourKeyword = [
+      "worker",
+      "labour",
+      "labor",
+      "lebar",
+      "majdoor",
+      "mazdoor",
+      "मजदूर",
+      "लेबर",
+      "mechanic",
+      "mistri",
+      "mistry",
+      "मिस्त्री",
+      "मैकेनिक",
+      "electrician",
+      "bijli",
+      "इलेक्ट्रीशियन",
+      "बिजली",
+      "plumber",
+      "नल",
+      "ट्यूबवेल",
+      "welder",
+      "helper",
+      "sowing",
+      "planting",
+      "harvesting",
+      "katai",
+      "buwai",
+      "weeding",
+      "nindai",
+      "gudai",
+      "field work",
+    ].some((k) => lower.includes(k));
+
+    if (isLabourKeyword) {
+      navigate(`/Labour?search=${encodeURIComponent(query)}`);
+      return;
+    }
+
+    // 4. Match against defined machine / labour suggestions
+    const matchedMachine = SEARCH_SUGGESTIONS.find(
+      (s) =>
+        s.type === "machine" &&
+        (s.keywords.some((k) => lower.includes(k)) ||
+          lower.includes(s.title.toLowerCase()))
+    );
+
+    if (matchedMachine) {
+      navigate(
+        `/machine?category=${encodeURIComponent(matchedMachine.category)}&search=${encodeURIComponent(query)}`
+      );
+      return;
+    }
+
+    const matchedLabour = SEARCH_SUGGESTIONS.find(
+      (s) =>
+        s.type === "labour" &&
+        (s.keywords.some((k) => lower.includes(k)) ||
+          lower.includes(s.title.toLowerCase()))
+    );
+
+    if (matchedLabour) {
+      navigate(
+        `/Labour?category=${encodeURIComponent(matchedLabour.category)}&search=${encodeURIComponent(query)}`
+      );
+      return;
+    }
+
+    // Default: Search in machine marketplace
+    navigate(`/machine?search=${encodeURIComponent(query)}`);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!showSuggestions || filteredSuggestions.length === 0) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleExecuteSearch(searchQuery);
+      }
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) =>
+        prev < filteredSuggestions.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) =>
+        prev > 0 ? prev - 1 : filteredSuggestions.length - 1
+      );
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (
+        highlightedIndex >= 0 &&
+        highlightedIndex < filteredSuggestions.length
+      ) {
+        const selected = filteredSuggestions[highlightedIndex];
+        setSearchQuery(selected.title);
+        handleExecuteSearch(selected.title, selected);
+      } else {
+        handleExecuteSearch(searchQuery);
+      }
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  };
 
   /* ==========================================================
      LANGUAGE SCREEN
@@ -301,7 +617,7 @@ function App() {
             </h1>
 
             <p className="mt-2 text-sm text-white/55">
-              Kisan ke saath â€¢ Farming ke liye
+              Kisan ke saath • Farming ke liye
             </p>
 
           </div>
@@ -508,12 +824,13 @@ function App() {
                 Home
               </a>
 
-              <a
-                href="#services"
+              <button
+                type="button"
+                onClick={handleFindServices}
                 className="text-sm font-medium text-white/60 transition hover:text-white"
               >
                 {t.services}
-              </a>
+              </button>
 
               <a
                 href="#how"
@@ -649,13 +966,16 @@ function App() {
                   Home
                 </a>
 
-                <a
-                  href="#services"
-                  onClick={() => setMenuOpen(false)}
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleFindServices();
+                    setMenuOpen(false);
+                  }}
                   className="rounded-xl px-4 py-3 text-sm font-bold text-white hover:bg-white/10"
                 >
                   {t.services}
-                </a>
+                </button>
 
                 <a
                   href="#how"
@@ -767,8 +1087,9 @@ function App() {
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
                   </Link>
 
-                  <a
-                    href="#services"
+                  <button
+                    type="button"
+                    onClick={handleFindServices}
                     className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[240px]"
                   >
                     <span className="flex items-center gap-3">
@@ -776,7 +1097,34 @@ function App() {
                       {t.find}
                     </span>
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                  </a>
+                  </button>
+                </>
+              ) : isAuthenticated && isLabour ? (
+                <>
+                  <Link
+                    to="/labour/dashboard"
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[260px]"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+                        <Users className="h-5 w-5" />
+                      </span>
+                      Labour Dashboard
+                    </span>
+                    <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={handleFindServices}
+                    className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[240px]"
+                  >
+                    <span className="flex items-center gap-3">
+                      <Tractor className="h-5 w-5 text-green-300" />
+                      {t.find}
+                    </span>
+                    <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                  </button>
                 </>
               ) : isAuthenticated && isDriver ? (
                 /* 2. DRIVER USER */
@@ -795,8 +1143,9 @@ function App() {
                       <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
                     </Link>
 
-                    <a
-                      href="#services"
+                    <button
+                      type="button"
+                      onClick={handleFindServices}
                       className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 font-bold text-white backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:bg-white/15 sm:min-w-[240px]"
                     >
                       <span className="flex items-center gap-3">
@@ -804,12 +1153,13 @@ function App() {
                         {t.find}
                       </span>
                       <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                    </a>
+                    </button>
                   </>
                 ) : (
                   <>
-                    <a
-                      href="#services"
+                    <button
+                      type="button"
+                      onClick={handleFindServices}
                       className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[290px]"
                     >
                       <span className="flex items-center gap-3">
@@ -819,7 +1169,7 @@ function App() {
                         {t.find}
                       </span>
                       <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                    </a>
+                    </button>
 
                     <Link
                       to="/driver/apply"
@@ -836,8 +1186,9 @@ function App() {
               ) : isAuthenticated ? (
                 /* 3. FARMER USER */
                 <>
-                  <a
-                    href="#services"
+                  <button
+                    type="button"
+                    onClick={handleFindServices}
                     className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[290px]"
                   >
                     <span className="flex items-center gap-3">
@@ -847,7 +1198,7 @@ function App() {
                       {t.find}
                     </span>
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                  </a>
+                  </button>
 
                   <Link
                     to="/bookings"
@@ -863,8 +1214,9 @@ function App() {
               ) : (
                 /* 4. GUEST / UNAUTHENTICATED */
                 <>
-                  <a
-                    href="#services"
+                  <button
+                    type="button"
+                    onClick={handleFindServices}
                     className="group flex min-h-[58px] items-center justify-between gap-7 rounded-2xl bg-green-500 px-5 py-3.5 font-bold text-white shadow-2xl shadow-green-950/40 transition duration-300 hover:-translate-y-1 hover:bg-green-400 sm:min-w-[290px]"
                   >
                     <span className="flex items-center gap-3">
@@ -874,7 +1226,7 @@ function App() {
                       {t.find}
                     </span>
                     <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                  </a>
+                  </button>
 
                   <Link
                     to="/login"
@@ -959,47 +1311,182 @@ function App() {
 
         <div className="mx-auto max-w-[1050px] rounded-[25px] border border-gray-200 bg-white p-5 shadow-[0_20px_70px_rgba(24,61,34,0.12)]">
 
-          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+          <div className="grid gap-3 lg:grid-cols-[1.1fr_1.5fr_auto]">
 
-            <div className="flex items-center gap-3 rounded-2xl bg-[#f3f6ef] px-4 py-3.5">
-
-              <MapPin className="h-5 w-5 text-green-700" />
-
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                  Location
-                </p>
-
-                <p className="text-sm font-bold text-[#18321f]">
-                  {t.location}
-                </p>
-              </div>
-
-            </div>
-
-            <div className="flex items-center gap-3 rounded-2xl bg-[#f3f6ef] px-4 py-3.5">
-
-              <Search className="h-5 w-5 text-green-700" />
-
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                  {t.searchTitle}
-                </p>
-
-                <p className="text-sm font-bold text-[#18321f]">
-                  {t.searchValue}
-                </p>
-              </div>
-
-            </div>
-
-            <a
-              href="#services"
-              className="flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-[#183d22] px-7 font-bold text-white transition hover:bg-green-700"
+            {/* 1. Location Section - Automatic GPS with Retry */}
+            <button
+              type="button"
+              onClick={handleLocationClick}
+              className="flex w-full items-center gap-3 rounded-2xl bg-[#f3f6ef] px-4 py-3.5 text-left transition hover:bg-[#e7eee1] focus:outline-none focus:ring-2 focus:ring-green-600/40"
+              title="Click to refresh current GPS location"
             >
-              {t.search}
+              <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
+                {locationStatus === "requesting_location" ? (
+                  <RefreshCw className="h-4 w-4 animate-spin text-green-700" />
+                ) : locationStatus === "permission_denied" ? (
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                ) : (
+                  <MapPin className="h-4 w-4 text-green-700" />
+                )}
+                {locationStatus === "location_ready" && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-600"></span>
+                  </span>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Location (GPS)
+                  </p>
+                  <span className="text-[10px] font-semibold text-green-700 hover:underline">
+                    {locationStatus === "requesting_location"
+                      ? "Detecting..."
+                      : locationStatus === "permission_denied"
+                      ? "Retry GPS"
+                      : "Refresh"}
+                  </span>
+                </div>
+
+                <p className="truncate text-sm font-bold text-[#18321f]">
+                  {locationDisplayTitle}
+                </p>
+              </div>
+            </button>
+
+            {/* 2. What Do You Need? - Functional Search Input & Autocomplete */}
+            <div ref={searchContainerRef} className="relative">
+              <div className="flex min-h-[56px] items-center gap-3 rounded-2xl bg-[#f3f6ef] px-4 py-2 transition focus-within:bg-[#ebf2e4] focus-within:ring-2 focus-within:ring-green-600/40">
+                <Search className="h-5 w-5 shrink-0 text-green-700" />
+
+                <div className="min-w-0 flex-1">
+                  <label
+                    htmlFor="homepage-hero-search-input"
+                    className="block text-[10px] font-bold uppercase tracking-wider text-gray-400"
+                  >
+                    {t.searchTitle}
+                  </label>
+
+                  <input
+                    id="homepage-hero-search-input"
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setShowSuggestions(true);
+                      setHighlightedIndex(-1);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={
+                      t.searchPlaceholder ||
+                      "What do you need? Machine, Worker or Driver"
+                    }
+                    autoComplete="off"
+                    className="w-full bg-transparent text-sm font-bold text-[#18321f] placeholder:text-gray-400 focus:outline-none"
+                  />
+                </div>
+
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setHighlightedIndex(-1);
+                      searchInputRef.current?.focus();
+                    }}
+                    className="rounded-full p-1 text-gray-400 transition hover:bg-gray-200 hover:text-gray-600"
+                    title="Clear"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Suggestions Dropdown */}
+              {showSuggestions && filteredSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl">
+                  <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                    {searchQuery.trim() ? "Matching Services" : "Popular Searches"}
+                  </div>
+
+                  {filteredSuggestions.map((item, index) => {
+                    const isHighlighted = index === highlightedIndex;
+                    return (
+                      <div
+                        key={item.id}
+                        onMouseEnter={() => setHighlightedIndex(index)}
+                        onClick={() => {
+                          setSearchQuery(item.title);
+                          handleExecuteSearch(item.title, item);
+                        }}
+                        className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 transition ${
+                          isHighlighted
+                            ? "bg-green-50 text-green-950"
+                            : "hover:bg-gray-50 text-gray-800"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {item.type === "machine" ? (
+                            <Tractor className="h-4 w-4 shrink-0 text-green-700" />
+                          ) : item.type === "transport" ? (
+                            <Truck className="h-4 w-4 shrink-0 text-purple-700" />
+                          ) : item.type === "driver" ? (
+                            <Tractor className="h-4 w-4 shrink-0 text-amber-700" />
+                          ) : (
+                            <Users className="h-4 w-4 shrink-0 text-blue-700" />
+                          )}
+
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">
+                              {item.title}
+                            </p>
+                            {item.hindi && (
+                              <p className="truncate text-xs text-gray-500">
+                                {item.hindi}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <span
+                          className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                            item.type === "machine"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : item.type === "driver"
+                              ? "bg-amber-50 text-amber-700 border-amber-200"
+                              : item.type === "transport"
+                              ? "bg-purple-50 text-purple-700 border-purple-200"
+                              : "bg-blue-50 text-blue-700 border-blue-200"
+                          }`}
+                        >
+                          {item.type === "machine"
+                            ? "Machine"
+                            : item.type === "driver"
+                            ? "Driver"
+                            : item.type === "transport"
+                            ? "Transport"
+                            : "Labour"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Search Button */}
+            <button
+              type="button"
+              onClick={() => handleExecuteSearch(searchQuery)}
+              className="flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-[#183d22] px-7 font-bold text-white shadow-md transition hover:bg-green-700 active:scale-[0.99]"
+            >
+              <span>{t.search}</span>
               <ArrowRight className="h-4 w-4" />
-            </a>
+            </button>
 
           </div>
 

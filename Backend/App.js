@@ -10,6 +10,10 @@ const helmet = require("helmet");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 
+process.on("unhandledRejection", (reason) => {
+    console.error("Unhandled Promise Rejection in server:", reason?.message || reason);
+});
+
 const Machine =
     require("./models/ListingMachin.js");
 
@@ -32,6 +36,7 @@ const {
     HIGHER_EXTRA_CHARGE_RATE_AFTER_MISSING_BIGHA
 } = require("./utils/groupBooking.js");
 const { cloudinary } = require("./Cloudinary.js");
+const { filterAndRankByLocation } = require("./utils/locationService.js");
 
 const groupBookings =
     require("./routes/groupBookings.js");
@@ -86,6 +91,8 @@ const creditsRoutes =
 
 const labourRoutes =
     require("./routes/labour.js");
+const labourReviewsMapsRoutes =
+    require("./routes/labourReviewsMaps.js");
 
 const adminLabourRoutes =
     require("./routes/adminLabour.js");
@@ -103,6 +110,9 @@ const passport =
 
 
 const app = express();
+
+// Trust reverse proxy (Render, Cloudflare, etc.) for HTTPS detection & secure cookies
+app.set("trust proxy", 1);
 
 const port =
     Number(process.env.PORT) || 5000;
@@ -143,15 +153,31 @@ app.use(helmet());
 // CORS
 // ======================================================
 
+const allowedOrigins = [
+    process.env.CLIENT_URL,
+    process.env.FRONTEND_URL,
+    process.env.CUSTOM_DOMAIN ? `https://${process.env.CUSTOM_DOMAIN.replace(/^https?:\/\//, "")}` : null,
+    process.env.CUSTOM_DOMAIN ? `https://www.${process.env.CUSTOM_DOMAIN.replace(/^(https?:\/\/)?(www\.)?/, "")}` : null,
+    "http://localhost:5173",
+    "http://localhost:5000",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173"
+].filter(Boolean);
+
 app.use(
     cors({
-
-        origin:
-            process.env.CLIENT_URL ||
-            "http://localhost:5173",
-
-        credentials: true
-
+        origin: (origin, callback) => {
+            if (!origin) return callback(null, true);
+            if (allowedOrigins.includes(origin)) return callback(null, true);
+            // Allow Vercel preview domains e.g. https://workshetu-*.vercel.app
+            if (/^https:\/\/([a-z0-9-]+)\.vercel\.app$/i.test(origin)) {
+                return callback(null, true);
+            }
+            return callback(new Error(`CORS origin not allowed: ${origin}`));
+        },
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
     })
 );
 
@@ -179,6 +205,10 @@ const sessionStore = MongoStore.create({
     mongoUrl: process.env.MONGO_URL,
     dbName: "workshetu",
     collectionName: "sessions"
+});
+
+sessionStore.on("error", (sessionError) => {
+    console.error("Session store connection error:", sessionError?.message || sessionError);
 });
 
 // A request can finish after logout (or after its session expires), when the
@@ -210,11 +240,13 @@ app.use(
 
             httpOnly: true,
 
-            sameSite: "lax",
+            sameSite:
+                process.env.NODE_ENV === "production"
+                    ? "none"
+                    : "lax",
 
             secure:
-                process.env.NODE_ENV ===
-                "production",
+                process.env.NODE_ENV === "production",
 
             maxAge:
                 7 *
@@ -337,7 +369,17 @@ app.use(
 
 app.use(
     "/api/labour",
+    labourReviewsMapsRoutes
+);
+
+app.use(
+    "/api/labour",
     labourRoutes
+);
+
+app.use(
+    "/api/Labour",
+    labourReviewsMapsRoutes
 );
 
 app.use(
@@ -363,18 +405,16 @@ app.use(
 // ======================================================
 
 app.get(
-    "/api/health",
+    ["/health", "/api/health"],
     (req, res) => {
-
-        res.json({
-
-            database:
-                databaseReady
-                    ? "connected"
-                    : "disconnected"
-
+        const isDbConnected = databaseReady && mongoose.connection.readyState === 1;
+        res.status(isDbConnected ? 200 : 503).json({
+            status: isDbConnected ? "ok" : "degraded",
+            service: "workshetu-api",
+            database: isDbConnected ? "connected" : "disconnected",
+            timestamp: new Date().toISOString(),
+            uptime: Math.floor(process.uptime())
         });
-
     }
 );
 
@@ -386,63 +426,127 @@ app.get(
 app.get(
     "/api/machine",
     async (req, res) => {
-
         if (!databaseReady) {
-
             return res.status(503).json({
-
-                message:
-                    "Database is not connected."
-
+                message: "Database is not connected."
             });
-
         }
-
 
         try {
+            const {
+                latitude,
+                longitude,
+                city,
+                location,
+                category,
+                search,
+                radiusKm = 5
+            } = req.query;
 
-            const suspendedOrSuspected = await User.find({
-                $or: [
-                    { isActive: false },
-                    { driverApplicationStatus: "Suspected" }
-                ]
-            }).select("_id");
-            const excludedOwnerIds = suspendedOrSuspected.map((u) => u._id);
+            // Cache suspended/suspected owner exclusions for 30s to eliminate redundant full table scans on users
+            if (!global.__workshetu_excludedOwnerCache || Date.now() - global.__workshetu_excludedOwnerTime > 30000) {
+                const suspendedOrSuspected = await User.find({
+                    $or: [
+                        { isActive: false },
+                        { driverApplicationStatus: "Suspected" }
+                    ]
+                }).select("_id").lean();
+                global.__workshetu_excludedOwnerCache = suspendedOrSuspected.map((u) => u._id);
+                global.__workshetu_excludedOwnerTime = Date.now();
+            }
+            const excludedOwnerIds = global.__workshetu_excludedOwnerCache || [];
 
-            const machines =
-                await Machine
-                    .find({
-                        owner: { $nin: excludedOwnerIds },
-                        availability: { $ne: "Hidden" }
-                    })
-                    .populate("owner", "fullName location driverApplicationStatus")
-                    .sort({
-                        createdAt: -1
-                    });
+            const filter = {
+                owner: { $nin: excludedOwnerIds },
+                availability: { $ne: "Hidden" }
+            };
 
+            if (category && category !== "All" && category !== "all") {
+                filter.category = category;
+            }
 
-            return res.json(
-                machines
-            );
+            if (search && typeof search === "string" && search.trim()) {
+                const term = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                filter.$or = [
+                    { title: { $regex: term, $options: "i" } },
+                    { category: { $regex: term, $options: "i" } },
+                    { description: { $regex: term, $options: "i" } },
+                    { location: { $regex: term, $options: "i" } }
+                ];
+            }
 
+            const rawMachines = await Machine
+                .find(filter)
+                .select("title category vehicleNumber image price unit power fuelType year location latitude longitude availability owner createdAt")
+                .populate("owner", "fullName location driverApplicationStatus")
+                .sort({ createdAt: -1 })
+                .lean();
 
-        } catch (error) {
+            const userLat = latitude != null && latitude !== ""
+                ? Number(latitude)
+                : req.user?.latitude != null ? Number(req.user.latitude) : null;
+            const userLon = longitude != null && longitude !== ""
+                ? Number(longitude)
+                : req.user?.longitude != null ? Number(req.user.longitude) : null;
+            const userCity = city || location || req.user?.location || "";
 
-            console.error(
-                "Failed to load machines:",
-                error.message
-            );
+            const userLocation = {
+                latitude: userLat,
+                longitude: userLon,
+                city: userCity,
+                location: userCity
+            };
 
+            const parsedRadius = Math.min(Math.max(Number(radiusKm) || 5, 1), 200);
 
-            return res.status(500).json({
-
-                message:
-                    "Unable to load machines."
-
+            const locationResult = filterAndRankByLocation(rawMachines, {
+                userLocation,
+                radiusKm: parsedRadius,
+                locationField: "location",
+                progressiveRadius: true
             });
 
-        }
+            if (locationResult.locationRequired) {
+                return res.json({
+                    success: true,
+                    locationRequired: true,
+                    message: "Location permission required. Enable GPS to view machines near you.",
+                    userCity: "",
+                    userCoordinates: null,
+                    radiusKm: parsedRadius,
+                    appliedRadiusKm: parsedRadius,
+                    initialRadiusKm: parsedRadius,
+                    isExpandedRadius: false,
+                    nearbyCount: 0,
+                    sameCityCount: 0,
+                    nearbyMachines: [],
+                    sameCityMachines: [],
+                    machines: []
+                });
+            }
 
+            return res.json({
+                success: true,
+                locationRequired: false,
+                userCity: locationResult.userCity,
+                userCoordinates: locationResult.userCoordinates,
+                radiusKm: locationResult.appliedRadiusKm || locationResult.radiusKm,
+                appliedRadiusKm: locationResult.appliedRadiusKm || locationResult.radiusKm,
+                initialRadiusKm: locationResult.initialRadiusKm || parsedRadius,
+                isExpandedRadius: Boolean(locationResult.isExpandedRadius),
+                nearbyCount: locationResult.nearbyCount,
+                sameCityCount: locationResult.sameCityCount,
+                total: locationResult.total,
+                nearbyMachines: locationResult.nearby,
+                sameCityMachines: locationResult.sameCity,
+                machines: locationResult.merged
+            });
+        } catch (error) {
+            console.error("Failed to load machines:", error.message);
+            return res.status(500).json({
+                message: "Unable to load machines."
+            });
+        }
     }
 );
 

@@ -322,14 +322,41 @@ totalPrice: {
         select: false
     },
 
+    completionOtpCipher: {
+        type: String,
+        select: false
+    },
+
     completionOtpExpiresAt: {
         type: Date,
+        select: false
+    },
+
+    otpAttempts: {
+        type: Number,
+        default: 0,
+        select: false
+    },
+
+    otpCooldownUntil: {
+        type: Date,
+        default: null,
         select: false
     },
 
     otpVerified: {
         type: Boolean,
         default: false
+    },
+
+    otpVerifiedAt: {
+        type: Date,
+        default: null
+    },
+
+    workCompletedAt: {
+        type: Date,
+        default: null
     }
 
 }, {

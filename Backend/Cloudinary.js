@@ -9,9 +9,9 @@ const CloudinaryStorage = typeof cloudinaryStorageModule === "function"
     : cloudinaryStorageModule.CloudinaryStorage;
 
 cloudinary.config({
-    cloud_name: (process.env.CLOUD_NAME || "").trim(),
-    api_key: (process.env.API_KEY || "").trim(),
-    api_secret: (process.env.API_SECRET || "").trim(),
+    cloud_name: (process.env.CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME || "").trim(),
+    api_key: (process.env.API_KEY || process.env.CLOUDINARY_API_KEY || "").trim(),
+    api_secret: (process.env.API_SECRET || process.env.CLOUDINARY_API_SECRET || "").trim(),
 });
 
 const storage = new CloudinaryStorage({

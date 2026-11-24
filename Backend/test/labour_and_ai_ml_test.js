@@ -2,7 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { classifyIntent } = require('../utils/mlClassifier');
 const { rankLabourListings, rankMachineListings } = require('../utils/mlRecommender');
+const { detectIntent, serviceSearchFilters } = require('../utils/aiIntent');
 const Labour = require('../models/Labour');
+const Review = require('../models/Review');
 
 // ==========================================
 // 1. ML INTENT CLASSIFIER TESTS
@@ -36,6 +38,32 @@ test('mlClassifier: identifies labour search queries across English, Hindi, Hing
         assert.equal(res.intent, 'SEARCH_LABOUR', `Failed for query: "${q}", got ${res.intent}`);
         assert.ok(res.confidence > 0.3, `Confidence should be significant: ${res.confidence}`);
     }
+});
+
+test('Labour AI: deterministic intents and profession filters', () => {
+    const labourUser = { _id: '507f1f77bcf86cd799439011', role: 'Labour' };
+    const cases = [
+        ['Mujhe mistri chahiye.', 'labour'],
+        ['Find electrician near me.', 'labour'],
+        ['Mujhe tractor mechanic chahiye.', 'labour'],
+        ['Main apni Labour profile dekhna chahta hoon.', 'labour_profile'],
+        ['Meri listing update karni hai.', 'labour_profile_update'],
+        ['Mere pending work requests dikhao.', 'labour_requests'],
+        ['Mere accepted requests dikhao.', 'labour_requests'],
+        ['Main engineer hoon, register kaise karun?', 'labour_registration'],
+        ['Beldar chahiye.', 'labour'],
+        ['Show my completed work.', 'labour_requests']
+    ];
+
+    for (const [query, expected] of cases) {
+        const detected = detectIntent(query, [], labourUser, 'labour');
+        assert.equal(detected.type, expected, `Unexpected intent for "${query}"`);
+        if (detected.status) assert.ok(['Pending', 'Accepted', 'Completed', 'All'].includes(detected.status));
+    }
+
+    assert.equal(serviceSearchFilters('labour', 'Find plumber near my location.', []).labourType, 'Plumber');
+    assert.equal(serviceSearchFilters('labour', 'Mujhe mistri chahiye.', []).labourType, 'Mason');
+    assert.equal(serviceSearchFilters('labour', 'Beldar chahiye.', []).labourType, 'Beldar');
 });
 
 test('mlClassifier: identifies price inquiry intents in English, Hindi, Hinglish', () => {
@@ -229,6 +257,20 @@ test('Labour model: schema exposes expected enum categories and required fields'
     assert.ok(statusEnum.includes('Approved'));
     assert.ok(statusEnum.includes('Pending'));
     assert.ok(statusEnum.includes('Rejected'));
+});
+
+test('Labour review and location schemas expose privacy and integrity fields', () => {
+    assert.ok(Labour.schema.path('mapVisibilityConsent'));
+    assert.ok(Labour.schema.path('publicLocation'));
+    assert.ok(Labour.schema.path('latitude'));
+    assert.ok(Labour.schema.path('longitude'));
+    assert.ok(Review.schema.path('labour'));
+    assert.ok(Review.schema.path('bookingId'));
+    assert.ok(Review.schema.path('verifiedBooking'));
+    assert.ok(Review.schema.path('rating').isRequired);
+    assert.ok(Review.schema.indexes().some(([keys, options]) =>
+        keys.bookingId === 1 && options.unique === true
+    ));
 });
 
 // ==========================================

@@ -377,5 +377,26 @@
     "rights": "All rights reserved.",
     "farmerBottomLine": "Better access to machinery, one booking at a time.",
     "driverBottomLine": "Your work. Your listings. One simple workspace."
+  },
+  "labourProfile": {
+    "ownerCannotReview": "You own this profile, so you cannot review your own service.",
+    "noReviews": "No verified reviews yet.",
+    "editReview": "Edit your review",
+    "deleteReview": "Delete your review",
+    "deleteReviewConfirm": "Delete your review? This cannot be undone.",
+    "reviewUpdated": "Review updated.",
+    "reviewDeleted": "Review deleted.",
+    "reviewSaveError": "Review could not be saved.",
+    "reviewDeleteError": "Review could not be deleted.",
+    "saveReview": "Save changes",
+    "ratingLabel": "Choose a rating",
+    "mapTitle": "Service location",
+    "locationUnavailable": "Location not available",
+    "approximateServiceArea": "Approximate service area",
+    "serviceRadius": "Service radius: {{radius}} km",
+    "useMyLocation": "Use my location",
+    "privateCoordinates": "Exact worker coordinates are private.",
+    "browserLocationUnsupported": "Location access is not supported by this browser.",
+    "customerLocationDenied": "Your location permission was not granted."
   }
 }

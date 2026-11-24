@@ -136,10 +136,19 @@ function serviceSearchFilters(type, message, history) {
     const labourTypes = [
       ["Tractor Driver", /\btractor\s+driver\b/i], ["Harvester Operator", /\bharvester\s+operator\b/i],
       ["Loader Operator", /\bloader\s+operator\b/i], ["Truck Driver", /\btruck\s+driver\b/i],
-      ["Farm Worker", /\b(?:farm\s+worker|farm\s+labou?r|agricultural\s+worker)\b|\u0915\u093f\u0938\u093e\u0928\s+\u092e\u091c\u0926\u0942\u0930|\u092e\u091c\u0926\u0942\u0930/iu],
-      ["Electrician", /\belectrician\b/i], ["Mechanical", /\bmechanic(?:al)?\b/i], ["Welder", /\bwelder\b/i],
-      ["Plumber", /\bplumber\b/i], ["Helper", /\bhelper\b/i], ["Irrigation Technician", /\birrigation\s+technician\b/i],
-      ["Spray Machine Operator", /\bspray\s+machine\s+operator\b/i]
+      ["Farm Worker", /\b(?:farm\s+worker|farm\s+labou?r|agricultural\s+worker|agricultural\s+labour|kheti\s+labour|kheti\s+ke\s+liye\s+mazdoor)\b|\u0915\u093f\u0938\u093e\u0928\s+\u092e\u091c\u0926\u0942\u0930|\u092e\u091c\u0926\u0942\u0930/iu],
+      ["Beldar", /\bbeldar\b|\u092c\u0947\u0932\u0926\u093e\u0930/iu],
+      ["Mason", /\bmistri\b|\u092e\u093f\u0938\u094d\u0924\u094d\u0930\u0940|\b(?:construction|masonry)\b/i],
+      ["Electrician", /\belectrician\b|\u0907\u0932\u0947\u0915\u094d\u091f\u094d\u0930\u0940\u0936\u093f\u092f\u0928/iu],
+      ["Mechanical", /\bmechanic(?:al)?\b|\u092f\u0902\u0924\u094d\u0930\u093f\u0915|\u091f\u094d\u0930\u0948\u0915\u094d\u091f\u0930\s+\u092e\u0947\u0915\u0947\u0928\u093f\u0915/iu],
+      ["Welder", /\bwelder\b|\u0935\u0947\u0932\u094d\u0921\u0930/iu],
+      ["Plumber", /\bplumber\b|\u092a\u094d\u0932\u092c\u0930/iu],
+      ["Carpenter", /\bcarpenter\b|\u092c\u0922\u093c\u0908/iu],
+      ["Painter", /\bpainter\b|\u0930\u0902\u0917\u0938\u093e\u091c\u093c/iu],
+      ["Helper", /\bhelper\b/i],
+      ["Irrigation Technician", /\birrigation\s+technician\b/i],
+      ["Spray Machine Operator", /\bspray\s+machine\s+operator\b/i],
+      ["Engineer", /\bengineer\b|\u0907\u0902\u091c\u0940\u0928\u093f\u092f\u0930/iu]
     ];
     const match = labourTypes.find(([, pattern]) => pattern.test(context));
     if (match) args.labourType = match[0];
@@ -152,7 +161,7 @@ function serviceSearchFilters(type, message, history) {
   return args;
 }
 
-function detectIntent(message, history, user) {
+function detectIntent(message, history, user, pageContext = "general") {
   const trimmed = message.trim();
   const lower = trimmed.toLocaleLowerCase();
   const previousUsers = history.filter((entry) => entry.role === "user").map((entry) => entry.content).join(" ");
@@ -192,7 +201,7 @@ function detectIntent(message, history, user) {
     if (/\b(?:requests?|incoming|driver\s+requests?)\b|\b(?:meri|my|nayi)\b.{0,25}\b(?:requests?|bookings?)\b|\u0930\u093f\u0915\u094d\u0935\u0947\u0938\u094d\u091f/iu.test(trimmed)) {
       return { type: "driver_requests" };
     }
-    if (/\b(?:my\s+listings?|meri\s+listings?|listings?)\b|\b(?:meri|my)\b.{0,25}\b(?:machines?|equipment|listings?)\b|\u092e\u0947\u0930\u0940\s+\u0932\u093f\u0938\u094d\u091f\u093f\u0902\u0917/iu.test(trimmed)) {
+    if (/\b(?:(?:my|meri|apni|show|registered)\s+.*(?:machines?|listings?|tractors?|equipment|gadi)|my\s+listings?|meri\s+listings?|registered\s+machines?)\b|\b(?:meri|my)\b.{0,25}\b(?:machines?|equipment|listings?)\b|\u092e\u0947\u0930\u0940\s+\u0932\u093f\u0938\u094d\u091f\u093f\u0902\u0917|\u092e\u0947\u0930\u0940\s+\u092e\u0936\u0940\u0928/iu.test(trimmed)) {
       return { type: "driver_listings" };
     }
     if (/\b(earnings?|kamai|payouts?|mera\s+payout|meri\s+kamai|kitne\s+paise)\b|\u0915\u092e\u093e\u0908/iu.test(trimmed)) {
@@ -201,6 +210,42 @@ function detectIntent(message, history, user) {
     if (/\b(profile\s+status|account\s+status|driver\s+status|mera\s+status|verification\s+status|approval\s+status)\b|\u0938\u094d\u091f\u0947\u091f\u0938/iu.test(trimmed)) {
       return { type: "driver_status" };
     }
+  }
+
+  // Universal Labour search intent: Works for Farmers, Drivers, Labour, and all users
+  const workerWords = /\b(?:labou?r|worker|mistri|mason|engineer|technician|mechanic|electrician|plumber|carpenter|painter|beldar|mazdoor|kheti\s+mazdoor|kheti\s+labour)\b|\u092e\u091c\u0926\u0942\u0930|\u092c\u0947\u0932\u0926\u093e\u0930|\u092e\u093f\u0938\u094d\u0924\u094d\u0930\u0940|\u0932\u0947\u092c\u0930/iu.test(trimmed);
+  const searchWords = /\b(?:need|find|search|show|want|hire|looking\s+for|chahiye|dikhao|dhundo|dhoondo|mujhe|list)\b|\u091a\u093e\u093f\u090f|\u0926\u093f\u0916\u093e\u0913|\u0922\u0942\u0902\u0922\u094b/iu.test(trimmed);
+  if (workerWords && (searchWords || pageContext === "labour" || /\bmistri|mazdoor|\u092e\u091c\u0926\u0942\u0930|\u092e\u093f\u0938\u094d\u0924\u094d\u0930\u0940/iu.test(trimmed))) {
+    return { type: "labour", filters: serviceSearchFilters("labour", trimmed, history) };
+  }
+
+  // Labour role intents (Profile, requests, registrations)
+  const isLabour = !isAdmin && !isDriver && String(user?.role || "").trim().toLowerCase() === "labour";
+  if (pageContext === "labour" || isLabour) {
+    const profileRequest = /\b(?:my|meri|main\s+(?:apni|meri)|mujhe\s+meri|show|dekh(?:na|ao)|dikha(?:o|na))\b.{0,35}\b(?:labour\s+)?(?:profile|listing)\b|\u092e\u0947\u0930\u0940\s+(?:labour\s+)?(?:\u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932|\u0932\u093f\u0938\u094d\u091f\u093f\u0902\u0917)|\u092e\u0947\u0930\u0940\s+\u0932\u0947\u092c\u0930\s+\u0932\u093e\u0907\u0928/iu.test(trimmed);
+    if (profileRequest) {
+      if (/\b(?:update|edit|change|modify|badal|update\s+kar|listing\s+update)\b|\u0905\u092a\u0921\u0947\u091f|\u092c\u0926\u0932/iu.test(trimmed)) {
+        return { type: "labour_profile_update" };
+      }
+      return { type: "labour_profile" };
+    }
+
+    const registrationRequest = /\b(?:register|registration|apply|application|enroll|join)\b.{0,20}\b(?:labour|worker|mistri|engineer|mechanic|electrician|plumber|carpenter|painter|beldar)\b|\b(?:labour|worker|mistri|engineer|mechanic|electrician|plumber|carpenter|painter|beldar)\b.{0,20}\b(?:register|registration|apply|application|kaise|kya\s+process)\b|\u0932\u0947\u092c\u0930\s+\u092e\u0947\u0902\s+\u0930\u0917\u093f\u0938\u094d\u091f\u0930|\u0930\u091c\u093f\u0938\u094d\u091f\u094d\u0930\u0947\u0936\u0928\s+\u0915\u0948\u0938\u0947/iu.test(trimmed);
+    if (registrationRequest) return { type: "labour_registration" };
+
+    const requestStatus = /\b(?:pending|accepted|rejected|completed|work\s+requests?|requests?|booking\s+requests?|jobs?)\b|\u092a\u0947\u0902\u0921\u093f\u0902\u0917|\u090f\u0915\u094d\u0938\u0947\u092a\u094d\u091f|\u0930\u093f\u091c\u0947\u0915\u094d\u091f|\u0915\u0902\u092a\u094d\u0932\u0940\u091f|\u0915\u093e\u092e\s+\u0936\u0941\u0939\u093e\u092a/iu.test(trimmed);
+    const requestRequest = /\b(?:my|mere|meri|mujhe|show|dikha|dikh(?:ao|na)|view)\b.{0,35}\b(?:pending|accepted|rejected|completed|work\s+requests?|requests?|booking\s+requests?|jobs?)\b|\u092e\u0947\u0930\u0947?\s+(?:\u0915\u093e\u092e|\u0932\u0947\u092c\u0930)\s+\u0935\u0940\u092f\u094b\u091a/iu.test(trimmed);
+    if (requestStatus && requestRequest) {
+      let status = "All";
+      if (/\bpending\b|\u092a\u0947\u0902\u0921\u093f\u0902\u0917/iu.test(trimmed)) status = "Pending";
+      else if (/\baccepted\b|\u090f\u0915\u094d\u0938\u0947\u092a\u094d\u091f|\u0938\u094d\u0935\u0940\u0915\u093e\u0930/iu.test(trimmed)) status = "Accepted";
+      else if (/\brejected\b|\u0930\u093f\u091c\u0947\u0915\u094d\u091f/iu.test(trimmed)) status = "Rejected";
+      else if (/\b(?:completed|done)\b|\u0915\u0902\u092a\u094d\u0932\u0940\u091f|\u092a\u0942\u0930\u093e/iu.test(trimmed)) status = "Completed";
+      return { type: "labour_requests", status };
+    }
+
+    const bookingGuidance = /\b(?:book(?:ing)?|hire|hiring)\b.{0,30}\b(?:labour|worker|mistri|mechanic|electrician|plumber|beldar)\b|\b(?:labour|worker)\b.{0,30}\b(?:kaise|how)\b.{0,15}\b(?:book|hire)\b|\u0915\u0948\u0938\u0947\s+\u0938\u093f\u0915\u093e/iu.test(trimmed);
+    if (bookingGuidance) return { type: "labour_booking" };
   }
 
   // Farmer offer & calculation intents

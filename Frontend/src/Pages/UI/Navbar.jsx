@@ -19,6 +19,7 @@ import {
   Truck,
   LayoutDashboard,
   AlertTriangle,
+  Bot,
   HardHat,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -154,12 +155,14 @@ function Navbar() {
         ? [
             { to: "/Drivers", label: t("driver.bookingRequests", "Booking Requests"), icon: Truck },
             { to: "/driver/listings", label: t("driver.manageListings", "My Listings"), icon: Tractor },
+            { to: "/bookings", label: t("navbar.myBookings", "My Bookings"), icon: ClipboardList },
             { to: "/driver/completed", label: t("driver.completedWork", "Completed Work"), icon: ClipboardList },
             { to: "/Labour", label: "Farm Labour", icon: UserRound },
             { to: "/chat", label: t("driver.chat", "Chats"), icon: MessageCircle },
           ]
         : [
             { to: "/driver/apply", label: t("driver.applicationStatus", "Driver Application"), icon: Truck },
+            { to: "/bookings", label: t("navbar.myBookings", "My Bookings"), icon: ClipboardList },
             { to: "/machine", label: t("navbar.machinery", "Machinery"), icon: Tractor },
             { to: "/Labour", label: "Farm Labour", icon: UserRound },
             { to: "/services", label: t("navbar.services", "Services"), icon: Sprout },
@@ -167,8 +170,10 @@ function Navbar() {
     : isLabour
       ? [
           { to: "/labour/dashboard", label: "Labour Dashboard", icon: LayoutDashboard },
+          { to: "/bookings", label: t("navbar.myBookings", "My Bookings"), icon: ClipboardList },
           { to: "/labour/listings", label: "My Worker Profiles", icon: HardHat },
           { to: "/Labour", label: "Marketplace", icon: UserRound },
+          { to: "/labour/assistant", label: "Labour AI Assistant", icon: Bot },
           { to: "/chat", label: t("navbar.chats", "Chats"), icon: MessageCircle },
         ]
       : isFarmer
@@ -178,6 +183,7 @@ function Navbar() {
             { to: "/Labour", label: "Farm Labour", icon: UserRound },
             { to: "/services", label: t("navbar.services", "Services"), icon: Sprout },
             { to: "/bookings", label: t("navbar.myBookings", "My Bookings"), icon: ClipboardList },
+            { to: "/labour/assistant", label: "Labour AI Assistant", icon: Bot },
             { to: "/chat", label: t("navbar.chats", "Chats"), icon: MessageCircle },
           ]
         : [

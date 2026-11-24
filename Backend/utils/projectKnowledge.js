@@ -42,11 +42,21 @@ const ADMIN_KNOWLEDGE = [
   "- Promotional Campaigns ('/admin/offers'): Inspect active discount campaigns, budget utilization, remaining budget, and redemption metrics."
 ].join(" ");
 
+const LABOUR_KNOWLEDGE = [
+  "Labour Marketplace & Worker Guidance:",
+  "- Labour Categories: General Agricultural Labour, Sowing & Planting, Harvesting, Weeding & Field Prep, Fruit/Vegetable Picking, Loading & Unloading, Tractor Drivers, Harvester Operators, Loader Operators, Spray Machine Operators, Farm Workers, Beldars, Masons (Mistri), Electricians, Mechanics, Welders, Plumbers, and Helpers.",
+  "- Labour Booking Flow: Farmers hire skilled workers by specifying days required, task category, and booking date. The total wage is calculated as Daily Rate × Days Required.",
+  "- Phone Number Privacy: Farmers cannot see the worker's phone number or call button until the booking is Accepted by the worker. Pending, Rejected, or Cancelled bookings strictly mask contact details.",
+  "- Secure OTP Work Completion: After work is finished, the worker requests a cryptographically secure 6-digit completion OTP from the farmer. The worker enters this OTP in their Labour Dashboard to mark work as Completed and finalize earnings.",
+  "- Labour Registration & Management: Workers register at '/labour/apply', manage bookings at '/labour/dashboard', and view or edit listings at '/labour/listings'."
+].join(" ");
+
 const PROJECT_KNOWLEDGE = [
   GENERAL_KNOWLEDGE,
   PRICING_AND_OFFERS_KNOWLEDGE,
   FARMER_KNOWLEDGE,
   DRIVER_KNOWLEDGE,
+  LABOUR_KNOWLEDGE,
   ADMIN_KNOWLEDGE
 ].join(" ");
 
@@ -55,7 +65,7 @@ const PROJECT_KNOWLEDGE = [
  * to the user's role and conversational query.
  *
  * @param {string} query - User message or intent
- * @param {string} role - Authenticated role ('Farmer' | 'Driver' | 'Admin')
+ * @param {string} role - Authenticated role ('Farmer' | 'Driver' | 'Labour' | 'Admin')
  * @returns {string} - Tailored project knowledge text
  */
 function getRelevantKnowledge(query = "", role = "Farmer") {
@@ -68,6 +78,9 @@ function getRelevantKnowledge(query = "", role = "Farmer") {
     if (/driver|application|suspend|verify|approve|reject/i.test(lowerQuery)) {
       chunks.push(DRIVER_KNOWLEDGE);
     }
+    if (/labour|worker|mistri/i.test(lowerQuery)) {
+      chunks.push(LABOUR_KNOWLEDGE);
+    }
     if (/offer|campaign|discount|budget|price|pricing/i.test(lowerQuery)) {
       chunks.push(PRICING_AND_OFFERS_KNOWLEDGE);
     }
@@ -76,9 +89,20 @@ function getRelevantKnowledge(query = "", role = "Farmer") {
     if (/price|payout|earning|money|discount|charge/i.test(lowerQuery)) {
       chunks.push(PRICING_AND_OFFERS_KNOWLEDGE);
     }
+    if (/labour|worker|mistri|helper/i.test(lowerQuery)) {
+      chunks.push(LABOUR_KNOWLEDGE);
+    }
+  } else if (normRole === "labour") {
+    chunks.push(LABOUR_KNOWLEDGE);
+    if (/price|payout|earning|wage|rate/i.test(lowerQuery)) {
+      chunks.push(PRICING_AND_OFFERS_KNOWLEDGE);
+    }
   } else {
     // Farmer / Customer
     chunks.push(FARMER_KNOWLEDGE);
+    if (/labour|worker|mistri|beldar|mazdoor|carpenter|plumber|electrician/i.test(lowerQuery)) {
+      chunks.push(LABOUR_KNOWLEDGE);
+    }
     if (/group|pool|discount|offer|coupon|price|cost|kiraya|bigha|surcharge/i.test(lowerQuery)) {
       chunks.push(PRICING_AND_OFFERS_KNOWLEDGE);
     }
@@ -93,6 +117,7 @@ module.exports = {
   PRICING_AND_OFFERS_KNOWLEDGE,
   FARMER_KNOWLEDGE,
   DRIVER_KNOWLEDGE,
+  LABOUR_KNOWLEDGE,
   ADMIN_KNOWLEDGE,
   getRelevantKnowledge
 };

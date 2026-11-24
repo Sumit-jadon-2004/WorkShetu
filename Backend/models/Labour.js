@@ -1,6 +1,18 @@
 const mongoose = require("mongoose");
 
 const LABOUR_CATEGORIES = [
+    "Mistri & Construction",
+    "Engineer",
+    "Technician",
+    "Mechanic",
+    "Electrician",
+    "Plumber",
+    "Carpenter",
+    "Painter",
+    "Beldar",
+    "Agricultural Labour",
+    "General Labour",
+    "Other Professional",
     "General agricultural labour",
     "Sowing and planting",
     "Harvesting",
@@ -33,6 +45,13 @@ const labourSchema = new mongoose.Schema({
         trim: true
     },
 
+    subProfession: {
+        type: String,
+        trim: true,
+        maxlength: 100,
+        default: ""
+    },
+
     category: {
         type: String,
         enum: LABOUR_CATEGORIES,
@@ -48,6 +67,13 @@ const labourSchema = new mongoose.Schema({
         type: Number,
         default: 0,
         min: 0
+    },
+
+    qualification: {
+        type: String,
+        trim: true,
+        maxlength: 200,
+        default: ""
     },
 
     image: {
@@ -97,12 +123,58 @@ const labourSchema = new mongoose.Schema({
         max: 200
     },
 
+    availabilityDays: [{
+        type: String,
+        trim: true
+    }],
+
+    emergencyAvailability: {
+        type: Boolean,
+        default: false
+    },
+
+    profileVisibility: {
+        type: Boolean,
+        default: true
+    },
+
+    serviceLocation: {
+        type: String,
+        trim: true,
+        default: ""
+    },
+
     latitude: {
         type: Number
     },
 
     longitude: {
         type: Number
+    },
+
+    mapVisibilityConsent: {
+        type: Boolean,
+        default: false
+    },
+
+    publicLocation: {
+        type: String,
+        trim: true,
+        maxlength: 200,
+        default: ""
+    },
+
+    rating: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 5
+    },
+
+    reviewCount: {
+        type: Number,
+        default: 0,
+        min: 0
     },
 
     phone: {
@@ -162,7 +234,7 @@ const labourSchema = new mongoose.Schema({
 });
 
 // Pre-save synchronization hook between labourType/category and price/wageRate
-labourSchema.pre("save", function(next) {
+labourSchema.pre("save", function() {
     if (this.category && !this.labourType) {
         this.labourType = this.category;
     } else if (this.labourType && !this.category) {
@@ -178,7 +250,6 @@ labourSchema.pre("save", function(next) {
     } else if (this.availability === "Booked" || this.availability === "Hidden") {
         this.isAvailable = false;
     }
-    next();
 });
 
 // Static properties
@@ -188,6 +259,9 @@ labourSchema.statics.STATUSES = LABOUR_STATUSES;
 
 // Indexes for fast searching and filtering
 labourSchema.index({ availability: 1, status: 1 });
+labourSchema.index({ availability: 1, status: 1, labourType: 1 });
+labourSchema.index({ availability: 1, status: 1, latitude: 1, longitude: 1 });
+labourSchema.index({ owner: 1, availability: 1 });
 labourSchema.index({ labourType: 1 });
 labourSchema.index({ category: 1 });
 labourSchema.index({ price: 1 });

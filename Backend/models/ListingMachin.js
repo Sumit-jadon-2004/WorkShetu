@@ -129,6 +129,11 @@ const machineSchema = new Schema({
     }
 });
 
+// Performance & Geospatial Query Indexes
+machineSchema.index({ availability: 1, category: 1, createdAt: -1 });
+machineSchema.index({ availability: 1, latitude: 1, longitude: 1 });
+machineSchema.index({ owner: 1, availability: 1 });
+
 machineSchema.statics.getSupportedCategories = function () {
     return [...this.schema.path("category").enumValues];
 };

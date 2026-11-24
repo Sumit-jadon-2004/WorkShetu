@@ -29,6 +29,19 @@ const router = express.Router();
 const standaloneGroupLocks = new Map();
 const REJECTED_HISTORY_TTL_MS = 24 * 60 * 60 * 1000;
 
+const OTP_SECRET = process.env.SESSION_SECRET || "workshetu-otp-secret-salt-2025-v1";
+const OTP_ENCRYPTION_KEY = crypto.createHash("sha256").update(OTP_SECRET).digest();
+
+function decryptOtp(cipherText) {
+  if (!cipherText || !cipherText.includes(":")) return null;
+  const [ivHex, encrypted] = cipherText.split(":");
+  const iv = Buffer.from(ivHex, "hex");
+  const decipher = crypto.createDecipheriv("aes-256-cbc", OTP_ENCRYPTION_KEY, iv);
+  let decrypted = decipher.update(encrypted, "hex", "utf8");
+  decrypted += decipher.final("utf8");
+  return decrypted;
+}
+
 async function expireOverdueBookings(queryFilter = {}) {
   const now = new Date();
   const overdueBookings = await Booking.find({
@@ -129,7 +142,7 @@ function requireUser(req, res, next) {
   next();
 }
 
-const requireFarmer = [isLoggedIn, isFarmer];
+const requireFarmer = [isLoggedIn];
 const requireCustomer = [isLoggedIn];
 const requireOwner = [isLoggedIn, (req, res, next) => {
   const role = String(req.user.role || "").trim().toLowerCase();
@@ -243,11 +256,12 @@ async function createGroup(req, res) {
       const customer = await User.findById(req.customerId).session(session);
       if (!machine) throw Object.assign(new Error("Machine not found."), { status: 404 });
       if (!customer) throw Object.assign(new Error("User not found."), { status: 401 });
-      if (!isFarmerAccount(customer)) throw Object.assign(new Error("Only an active Farmer account can join a group booking."), { status: 403 });
+      if (!isFarmerAccount(customer)) throw Object.assign(new Error("Only an active account can join a group booking."), { status: 403 });
       if (!hasValidCoordinates(customer)) throw Object.assign(new Error("Save your farm coordinates in your Farmer profile before creating a group booking."), { status: 400 });
       if (req.body.areaUnit && req.body.areaUnit !== "Bigha") throw Object.assign(new Error("Group booking land area must be entered in Bigha."), { status: 400 });
-      if (String(machine.owner) === String(customer._id)) {
-        throw Object.assign(new Error("You cannot book your own machine."), { status: 403 });
+      const machineOwnerId = String(machine.owner?._id || machine.owner);
+      if (machineOwnerId === String(customer._id)) {
+        throw Object.assign(new Error("You cannot book your own listing."), { status: 403 });
       }
       const machineOwner = await User.findById(machine.owner).select("role isAdmin isActive driverApplicationStatus").session(session);
       if (!machineOwner || !isDriverEligible(machineOwner) || machine.availability === "Hidden") {
@@ -462,11 +476,11 @@ router.get("/my/requests", [...requireCustomer, requireUser], async (req, res) =
         }
       ]
     })
-      .select("+completionOtp +completionOtpExpiresAt")
+      .select("+completionOtp +completionOtpCipher +completionOtpExpiresAt")
       .sort({ createdAt: -1 })
       .populate({
         path: "itemId",
-        select: "title category image location latitude longitude owner vehicleNumber",
+        select: "title name category labourType image location latitude longitude owner vehicleNumber price pricingUnit",
         populate: {
           path: "owner",
           select: "fullName phone profileImage driverVehicleType driverVehicleNumber driverApplicationStatus driverExperience location"
@@ -485,7 +499,7 @@ router.get("/my/requests", [...requireCustomer, requireUser], async (req, res) =
     });
   });
   const acceptedBookingsWithoutOtp = bookings.filter((booking) =>
-    booking.status === "Accepted" && (!booking.completionOtp || !isOtpActive(booking.completionOtpExpiresAt))
+    booking.status === "Accepted" && booking.requestType === "Machine" && (!booking.completionOtp || !isOtpActive(booking.completionOtpExpiresAt))
   );
 
   await Promise.all([
@@ -508,7 +522,8 @@ router.get("/my/requests", [...requireCustomer, requireUser], async (req, res) =
     })
   ]);
 
-  const resolveDriverInfo = (ownerDoc, listingDoc, bookingStatus) => {
+  const resolveDriverInfo = (ownerDoc, listingDoc, bookingStatus, requestType) => {
+    const isLabour = requestType === "Labour";
     const driverUser = (ownerDoc && typeof ownerDoc === "object" && ownerDoc.fullName)
       ? ownerDoc
       : (listingDoc?.owner && typeof listingDoc.owner === "object" && listingDoc.owner.fullName)
@@ -520,19 +535,21 @@ router.get("/my/requests", [...requireCustomer, requireUser], async (req, res) =
     }
 
     const isConfirmed = ["Accepted", "Completed"].includes(bookingStatus);
-    const vehicleType = driverUser.driverVehicleType || listingDoc?.category || "Tractor";
-    const vehicleNumber = driverUser.driverVehicleNumber || listingDoc?.vehicleNumber || "";
+    const vehicleType = isLabour
+      ? (listingDoc?.labourType || "Agricultural Worker")
+      : (driverUser.driverVehicleType || listingDoc?.category || "Tractor");
+    const vehicleNumber = isLabour ? "" : (driverUser.driverVehicleNumber || listingDoc?.vehicleNumber || "");
 
     return {
       _id: driverUser._id,
-      fullName: driverUser.fullName || "Verified Driver",
+      fullName: driverUser.fullName || (isLabour ? (listingDoc?.name || "Labour Worker") : "Verified Driver"),
       phone: isConfirmed ? (driverUser.phone || "") : "",
-      profileImage: driverUser.profileImage?.url || null,
+      profileImage: driverUser.profileImage?.url || driverUser.profileImage || null,
       vehicleType,
       vehicleNumber,
       driverApplicationStatus: driverUser.driverApplicationStatus || "None",
-      isVerified: driverUser.driverApplicationStatus === "Approved",
-      driverExperience: driverUser.driverExperience || 0,
+      isVerified: isLabour ? true : driverUser.driverApplicationStatus === "Approved",
+      driverExperience: isLabour ? (listingDoc?.experienceYears || 0) : (driverUser.driverExperience || 0),
       location: driverUser.location || listingDoc?.location || ""
     };
   };
@@ -545,7 +562,7 @@ router.get("/my/requests", [...requireCustomer, requireUser], async (req, res) =
         delete member.completionOtpExpiresAt;
       }
     }
-    const driverInfo = resolveDriverInfo(data.owner, data.listing, data.status);
+    const driverInfo = resolveDriverInfo(data.owner, data.listing, data.status, "Machine");
     data.driver = driverInfo;
     if (data.owner && typeof data.owner === "object" && !["Accepted", "Completed"].includes(data.status)) {
       data.owner.phone = "";
@@ -555,10 +572,23 @@ router.get("/my/requests", [...requireCustomer, requireUser], async (req, res) =
 
   const safeBookings = bookings.map((booking) => {
     const data = booking.toObject();
-    const driverInfo = resolveDriverInfo(data.owner, data.itemId, data.status);
+    const isConfirmed = ["Accepted", "Completed"].includes(data.status);
+    const driverInfo = resolveDriverInfo(data.owner, data.itemId, data.status, data.requestType);
     data.driver = driverInfo;
-    if (data.owner && typeof data.owner === "object" && !["Accepted", "Completed"].includes(data.status)) {
+    if (data.owner && typeof data.owner === "object" && !isConfirmed) {
       data.owner.phone = "";
+    }
+    if (data.requestType === "Labour") {
+      if (data.status === "Accepted" && data.completionOtpCipher) {
+        try {
+          data.completionOtp = decryptOtp(data.completionOtpCipher);
+        } catch (e) {
+          data.completionOtp = "";
+        }
+      } else if (data.status !== "Accepted") {
+        delete data.completionOtp;
+      }
+      delete data.completionOtpCipher;
     }
     return data;
   });
@@ -1096,7 +1126,8 @@ router.post("/single", [...requireCustomer, requireUser], async (req, res) => {
   ]);
   if (!machine) return res.status(404).json({ message: "Machine not found." });
   if (!customer) return res.status(401).json({ message: "User not found." });
-  if (String(machine.owner) === String(customer._id)) return res.status(403).json({ message: "You cannot book your own machine." });
+  const machineOwnerId = String(machine.owner?._id || machine.owner);
+  if (machineOwnerId === String(customer._id)) return res.status(403).json({ message: "You cannot book your own listing." });
 
   const machineOwner = await User.findById(machine.owner).select("role isAdmin isActive driverApplicationStatus bookingCredits freeRequestsUsed");
   if (!machineOwner || !isDriverEligible(machineOwner) || machine.availability === "Hidden") {

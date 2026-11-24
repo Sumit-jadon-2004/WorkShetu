@@ -1,51 +1,39 @@
 import { useState } from "react";
 import axios from "axios";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  AlertCircle,
-  CheckCircle2,
-  HardHat,
-  MapPin,
-  Phone,
-  ShieldCheck,
-  User,
-  Wrench,
-  Zap,
-} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AlertCircle, CheckCircle2, HardHat } from "lucide-react";
 import Navbar from "../UI/Navbar.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { useTranslation } from "react-i18next";
 
-const LABOUR_CATEGORIES = [
-  "Tractor Driver",
-  "Harvester Operator",
-  "Farm Worker",
-  "Spray Machine Operator",
-  "Irrigation Technician",
-  "Electrician",
-  "Mechanical",
-  "Welder",
-  "Carpenter",
-  "Plumber",
-  "Mason",
-  "Loader Operator",
-  "Truck Driver",
-  "Helper",
+const CATEGORIES = [
+  "Mistri & Construction", "Engineer", "Technician", "Mechanic",
+  "Electrician", "Plumber", "Carpenter", "Painter", "Beldar",
+  "Agricultural Labour", "General Labour", "Other Professional",
 ];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+const inputClass = "mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold outline-none focus:border-green-600 dark:border-slate-800 dark:bg-slate-800";
 
 export default function LabourApply() {
-  const { t } = useTranslation();
   const { user, isAuthenticated, refreshUser } = useAuth();
   const navigate = useNavigate();
-
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     name: user?.fullName || "",
-    labourType: "Tractor Driver",
-    price: "",
-    experience: 1,
-    location: user?.location || "",
     phone: user?.phone || "",
+    location: user?.location || "",
+    serviceLocation: user?.location || "",
+    labourType: "Agricultural Labour",
+    subProfession: "",
+    experience: 0,
+    skills: "",
+    qualification: "",
     description: "",
+    serviceRadiusKm: 25,
+    price: "",
+    pricingUnit: "per day",
+    availabilityDays: DAYS,
+    emergencyAvailability: false,
   });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -53,50 +41,60 @@ export default function LabourApply() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const validateStep = () => {
+    if (step === 1 && (!form.name.trim() || !/^[6-9]\d{9}$/.test(form.phone) || !form.location.trim())) {
+      return "Enter your name, valid 10-digit phone number, and location.";
+    }
+    if (step === 2 && (!form.labourType || !form.description.trim())) {
+      return "Choose a profession and describe your work.";
+    }
+    if (step === 3 && (!Number(form.price) || Number(form.price) <= 0 || !form.serviceLocation.trim())) {
+      return "Enter a valid charge and service location.";
+    }
+    return "";
+  };
+
+  const next = () => {
+    const message = validateStep();
+    if (message) {
+      setError(message);
+      return;
+    }
+    setError("");
+    setStep((current) => Math.min(4, current + 1));
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
     if (!isAuthenticated) {
       navigate("/login", { state: { from: "/labour/apply" } });
       return;
     }
-
+    const message = validateStep();
+    if (message) {
+      setError(message);
+      return;
+    }
     try {
       setLoading(true);
       setError("");
-
-      const formData = new FormData();
-      formData.append("name", form.name);
-      formData.append("labourType", form.labourType);
-      formData.append("price", form.price);
-      formData.append("experience", form.experience);
-      formData.append("location", form.location);
-      formData.append("phone", form.phone);
-      formData.append("description", form.description);
-
-      if (imageFile) {
-        formData.append("image", imageFile);
-      }
-
-      const res = await axios.post("/api/labour/apply", formData, {
+      const body = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        if (Array.isArray(value)) body.append(key, value.join(","));
+        else body.append(key, String(value));
+      });
+      if (imageFile) body.append("image", imageFile);
+      const response = await axios.post("/api/labour/apply", body, {
         headers: { "Content-Type": "multipart/form-data" },
         withCredentials: true,
       });
-
-      if (res.data?.success) {
-        setSuccess(true);
-        if (refreshUser) await refreshUser();
-        setTimeout(() => {
-          navigate("/labour/dashboard");
-        }, 1800);
-      } else {
-        setError(res.data?.message || "Failed to submit registration.");
-      }
-    } catch (err) {
-      console.error("Labour registration error:", err);
-      setError(
-        err.response?.data?.message ||
-          "Could not submit registration. Please try again."
-      );
+      if (!response.data?.success) throw new Error(response.data?.message || "Registration failed.");
+      setSuccess(true);
+      await refreshUser();
+      setTimeout(() => navigate("/labour/dashboard"), 1200);
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || requestError.message || "Could not submit registration.");
     } finally {
       setLoading(false);
     }
@@ -105,203 +103,64 @@ export default function LabourApply() {
   return (
     <>
       <Navbar />
-
-      <main className="min-h-screen bg-[#f8fafc] py-12 px-4 dark:bg-slate-950 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl">
-          {/* Header Card */}
-          <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-green-700 to-emerald-800 text-white shadow-md shadow-green-900/20">
-                <HardHat size={24} />
-              </div>
-              <div>
-                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  Worker Registration
-                </span>
-                <h1 className="text-xl font-black text-slate-900 dark:text-white sm:text-2xl">
-                  Register as a Labour Provider
-                </h1>
-              </div>
-            </div>
-
-            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-              Join WorkShetu to offer your agricultural skills, tractor driving, machinery operation, or farm labour services to local farmers.
-            </p>
-
-            {success ? (
-              <div className="mt-8 py-10 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                  <CheckCircle2 size={36} />
-                </div>
-                <h2 className="mt-4 text-xl font-black text-slate-900 dark:text-white">
-                  Registration Successful!
-                </h2>
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  Your Labour Provider account is ready. Redirecting to your Labour Dashboard…
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="mt-6 space-y-4 text-xs">
-                {error && (
-                  <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
-                    <AlertCircle size={16} />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                {/* Worker Name */}
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300">
-                    Full Name / Worker Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="e.g. Ramesh Kumar"
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold outline-none focus:border-green-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800"
-                  />
-                </div>
-
-                {/* Skill / Category */}
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300">
-                    Primary Skill / Role *
-                  </label>
-                  <select
-                    required
-                    value={form.labourType}
-                    onChange={(e) => setForm({ ...form, labourType: e.target.value })}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold outline-none focus:border-green-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800"
-                  >
-                    {LABOUR_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Daily Wage & Experience */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300">
-                      Expected Daily Wage (₹/Day) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="100"
-                      value={form.price}
-                      onChange={(e) => setForm({ ...form, price: e.target.value })}
-                      placeholder="e.g. 600"
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold outline-none focus:border-green-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300">
-                      Experience (Years)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={form.experience}
-                      onChange={(e) => setForm({ ...form, experience: e.target.value })}
-                      placeholder="e.g. 3"
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold outline-none focus:border-green-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800"
-                    />
-                  </div>
-                </div>
-
-                {/* Location & Phone */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300">
-                      Base Location / Village *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={form.location}
-                      onChange={(e) => setForm({ ...form, location: e.target.value })}
-                      placeholder="e.g. Rampur, Bareilly"
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold outline-none focus:border-green-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300">
-                      Phone Number *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      pattern="[6-9][0-9]{9}"
-                      value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                      placeholder="10-digit mobile number"
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold outline-none focus:border-green-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800"
-                    />
-                  </div>
-                </div>
-
-                {/* Photo Upload */}
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300">
-                    Profile Photo (Optional)
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setImageFile(file);
-                        setImagePreview(URL.createObjectURL(file));
-                      }
-                    }}
-                    className="mt-1 w-full text-xs text-slate-500 file:mr-3 file:rounded-xl file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-xs file:font-bold file:text-emerald-700 hover:file:bg-emerald-100"
-                  />
-                  {imagePreview && (
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="mt-2 h-20 w-20 rounded-xl object-cover border border-slate-200"
-                    />
-                  )}
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300">
-                    Tell farmers about your skills & experience
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    placeholder="e.g. 5 years experience driving Mahindra and Swaraj tractors, rotavator, cultivator, available 7 days a week."
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold outline-none focus:border-green-600 focus:bg-white dark:border-slate-800 dark:bg-slate-800"
-                  />
-                </div>
-
-                <div className="pt-4">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full rounded-xl bg-green-700 py-3.5 text-xs font-black text-white shadow-md shadow-green-700/20 transition hover:bg-green-800 disabled:opacity-50"
-                  >
-                    {loading ? "Registering..." : "Submit & Start Receiving Bookings"}
-                  </button>
-                </div>
-              </form>
-            )}
+      <main className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-950">
+        <section className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-700 text-white"><HardHat /></div>
+            <div><p className="text-xs font-black uppercase tracking-wider text-emerald-700">Worker Registration</p><h1 className="text-2xl font-black dark:text-white">Create your professional profile</h1></div>
           </div>
-        </div>
+          {success ? (
+            <div className="py-16 text-center"><CheckCircle2 className="mx-auto h-16 w-16 text-emerald-600" /><h2 className="mt-4 text-xl font-black dark:text-white">Registration successful</h2><p className="mt-2 text-sm text-slate-500">Opening your Labour dashboard…</p></div>
+          ) : (
+            <form onSubmit={submit} className="mt-8">
+              <div className="mb-8 grid grid-cols-4 gap-2">
+                {["Personal", "Profession", "Service", "Preview"].map((label, index) => <div key={label} className={`rounded-xl px-2 py-2 text-center text-xs font-black ${step === index + 1 ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-800"}`}>{index + 1}. {label}</div>)}
+              </div>
+              {error && <div className="mb-5 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-800"><AlertCircle size={16} />{error}</div>}
+
+              {step === 1 && <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-xs font-bold">Full name<input required value={form.name} onChange={(e) => update("name", e.target.value)} className={inputClass} /></label>
+                <label className="text-xs font-bold">Phone<input required pattern="[6-9][0-9]{9}" value={form.phone} onChange={(e) => update("phone", e.target.value)} className={inputClass} /></label>
+                <label className="text-xs font-bold sm:col-span-2">Location / Village<input required value={form.location} onChange={(e) => update("location", e.target.value)} className={inputClass} /></label>
+                <label className="text-xs font-bold sm:col-span-2">Profile photo<input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) { update("image", file); setImageFile(file); setImagePreview(URL.createObjectURL(file)); } }} className={inputClass} /></label>
+                {imagePreview && <img src={imagePreview} alt="Profile preview" className="h-24 w-24 rounded-2xl object-cover" />}
+              </div>}
+
+              {step === 2 && <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-xs font-bold">Profession<select value={form.labourType} onChange={(e) => update("labourType", e.target.value)} className={inputClass}>{CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></label>
+                <label className="text-xs font-bold">Sub-profession<input value={form.subProfession} onChange={(e) => update("subProfession", e.target.value)} placeholder="e.g. Brick masonry" className={inputClass} /></label>
+                <label className="text-xs font-bold">Experience (years)<input type="number" min="0" value={form.experience} onChange={(e) => update("experience", e.target.value)} className={inputClass} /></label>
+                <label className="text-xs font-bold">Qualification<input value={form.qualification} onChange={(e) => update("qualification", e.target.value)} className={inputClass} /></label>
+                <label className="text-xs font-bold sm:col-span-2">Skills (comma separated)<input value={form.skills} onChange={(e) => update("skills", e.target.value)} placeholder="Welding, wiring, tractor repair" className={inputClass} /></label>
+                <label className="text-xs font-bold sm:col-span-2">Work description<textarea required rows={4} value={form.description} onChange={(e) => update("description", e.target.value)} className={inputClass} /></label>
+              </div>}
+
+              {step === 3 && <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-xs font-bold">Service location<input required value={form.serviceLocation} onChange={(e) => update("serviceLocation", e.target.value)} className={inputClass} /></label>
+                <label className="text-xs font-bold">Work radius (km)<input type="number" min="1" max="200" value={form.serviceRadiusKm} onChange={(e) => update("serviceRadiusKm", e.target.value)} className={inputClass} /></label>
+                <label className="text-xs font-bold">Expected charges<input required type="number" min="1" value={form.price} onChange={(e) => update("price", e.target.value)} className={inputClass} /></label>
+                <label className="text-xs font-bold">Charge unit<select value={form.pricingUnit} onChange={(e) => update("pricingUnit", e.target.value)} className={inputClass}><option>per day</option><option>per hour</option><option>per acre</option><option>per bigha</option></select></label>
+                <fieldset className="sm:col-span-2"><legend className="text-xs font-bold">Available days</legend><div className="mt-2 flex flex-wrap gap-2">{DAYS.map((day) => <label key={day} className="rounded-lg bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800"><input type="checkbox" checked={form.availabilityDays.includes(day)} onChange={(e) => update("availabilityDays", e.target.checked ? [...form.availabilityDays, day] : form.availabilityDays.filter((item) => item !== day))} /> {day.slice(0, 3)}</label>)}</div></fieldset>
+                <label className="flex items-center gap-2 text-xs font-bold sm:col-span-2"><input type="checkbox" checked={form.emergencyAvailability} onChange={(e) => update("emergencyAvailability", e.target.checked)} /> Available for emergency requests</label>
+              </div>}
+
+              {step === 4 && <div className="space-y-3 rounded-2xl bg-slate-50 p-5 text-sm dark:bg-slate-800">
+                <h2 className="text-lg font-black dark:text-white">Profile preview</h2>
+                <p><b>{form.name}</b> · {form.labourType}{form.subProfession && ` · ${form.subProfession}`}</p>
+                <p>{form.experience} years · {form.skills || "Skills not specified"}</p>
+                <p>{form.location} · Service radius {form.serviceRadiusKm} km</p>
+                <p className="font-black text-emerald-700">₹{form.price} / {form.pricingUnit}</p>
+                <p className="text-slate-600 dark:text-slate-300">{form.description}</p>
+              </div>}
+
+              <div className="mt-8 flex justify-between gap-3">
+                <button type="button" disabled={step === 1 || loading} onClick={() => setStep((current) => current - 1)} className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold disabled:opacity-40 dark:border-slate-700">Back</button>
+                {step < 4 ? <button type="button" onClick={next} className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white">Continue</button> : <button type="submit" disabled={loading} className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white disabled:opacity-50">{loading ? "Publishing…" : "Publish profile"}</button>}
+              </div>
+            </form>
+          )}
+        </section>
       </main>
     </>
   );
 }
-

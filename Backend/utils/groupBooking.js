@@ -15,7 +15,7 @@ function hasValidCoordinates(point) {
 }
 
 function isFarmerAccount(user) {
-  return user?.role === "Farmer" && user.isAdmin !== true && user.isActive !== false;
+  return Boolean(user && user.isActive !== false && user.isAdmin !== true);
 }
 
 function isGroupLandEligible(totalLandArea) {

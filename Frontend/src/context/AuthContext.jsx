@@ -11,6 +11,24 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeWorkspace, setActiveWorkspaceState] = useState(() => {
+    try {
+      return localStorage.getItem("workshetu_active_workspace") || null;
+    } catch {
+      return null;
+    }
+  });
+
+  const switchWorkspace = useCallback((workspace) => {
+    setActiveWorkspaceState(workspace);
+    try {
+      if (workspace) {
+        localStorage.setItem("workshetu_active_workspace", workspace);
+      } else {
+        localStorage.removeItem("workshetu_active_workspace");
+      }
+    } catch {}
+  }, []);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -82,6 +100,8 @@ export function AuthProvider({ children }) {
         user,
         isAuthenticated: Boolean(user),
         loading,
+        activeWorkspace,
+        switchWorkspace,
         login,
         register,
         logout,
@@ -101,6 +121,8 @@ export function useAuth() {
       user: null,
       isAuthenticated: false,
       loading: false,
+      activeWorkspace: null,
+      switchWorkspace: () => {},
       login: async () => {},
       register: async () => {},
       logout: async () => {},

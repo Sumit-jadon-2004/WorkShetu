@@ -2,6 +2,7 @@
 // ==========================================
 // AUTH MIDDLEWARE
 // ==========================================
+const Labour = require("../models/Labour.js");
 
 function safeUser(user) {
     if (!user) return null;
@@ -37,6 +38,34 @@ function safeUser(user) {
         latitude: user.latitude,
         longitude: user.longitude,
         isActive: user.isActive
+    };
+}
+
+async function resolveUserProfileStatus(userId) {
+    if (!userId) return null;
+    const User = require("../models/Owner.js");
+    const [labourProfiles, user] = await Promise.all([
+        Labour.find({ owner: userId }).select("_id status availability").sort({ createdAt: -1 }).lean(),
+        User.findById(userId).select("role isAdmin driverApplicationStatus isActive").lean()
+    ]);
+
+    const isAdmin = Boolean(user?.isAdmin) || String(user?.role || "").toLowerCase() === "admin";
+    const hasDriverProfile =
+        !isAdmin &&
+        (String(user?.role || "").toLowerCase() === "driver" ||
+            user?.driverApplicationStatus === "Approved");
+    const hasLabourProfile = labourProfiles.length > 0;
+    const pendingLabourProfile = labourProfiles.find((profile) => profile.status === "Pending");
+
+    return {
+        hasLabourProfile,
+        hasDriverProfile,
+        hasBothProfiles: hasLabourProfile && hasDriverProfile,
+        hasIncompleteLabourRegistration:
+            String(user?.role || "").toLowerCase() === "labour" && !hasLabourProfile,
+        pendingLabourProfile: pendingLabourProfile || null,
+        driverApplicationStatus: user?.driverApplicationStatus || "None",
+        isAdmin
     };
 }
 
@@ -108,7 +137,7 @@ function roleRequired(role) {
         if (targetRole === "driver") {
             const isUserAdmin = req.user.isAdmin === true || userRole === "admin";
             if (isUserAdmin) return next();
-            if (userRole === "driver" && req.user.driverApplicationStatus === "Approved" && req.user.isActive !== false) {
+            if (req.user.driverApplicationStatus === "Approved" && req.user.isActive !== false) {
                 return next();
             }
             return res.status(403).json({
@@ -123,10 +152,21 @@ function roleRequired(role) {
             if (userRole === "labour" && req.user.isActive !== false) {
                 return next();
             }
-            return res.status(403).json({
-                success: false,
-                message: "You are not authorized to perform this action."
-            });
+            if (req.user.isActive === false) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You are not authorized to perform this action."
+                });
+            }
+            return Labour.exists({ owner: req.user._id })
+                .then((labourProfile) => {
+                    if (labourProfile) return next();
+                    return res.status(403).json({
+                        success: false,
+                        message: "You are not authorized to perform this action."
+                    });
+                })
+                .catch((error) => next(error));
         }
 
         if (userRole !== targetRole) {
@@ -179,6 +219,7 @@ function adminRequired(req, res, next) {
 
 module.exports = {
     safeUser,
+    resolveUserProfileStatus,
     isLoggedIn,
     roleRequired,
     isFarmer: roleRequired("Farmer"),

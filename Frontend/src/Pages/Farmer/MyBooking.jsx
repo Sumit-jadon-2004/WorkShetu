@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import axios from "axios";
 import {
   AlertCircle,
@@ -24,7 +24,7 @@ import {
 import Navbar from "../UI/Navbar.jsx";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n/i18n.js";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 
 const statusStyles = {
@@ -54,21 +54,43 @@ function DirectionsLink({ latitude, longitude }) {
   );
 }
 
-function CompletionCode({ otp }) {
-  const { t } = useTranslation();
+function CompletionCode({ otp, isLabour = false }) {
+  const { t, i18n } = useTranslation();
+  const [copied, setCopied] = useState(false);
   if (!otp) return null;
+
+  const handleCopy = () => {
+    try {
+      navigator.clipboard?.writeText(String(otp));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {}
+  };
+
+  const isHindi = i18n.language && i18n.language.startsWith("hi");
+
   return (
-    <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 p-4 text-green-900 dark:border-green-900 dark:bg-green-950/30 dark:text-green-200">
-      <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide">
-        <ShieldCheck size={16} />
-        {t("bookings.completionOtp", "Work completion OTP")}
+    <div className="mt-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 text-emerald-950 shadow-xs dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+          <ShieldCheck size={18} className="text-emerald-600 dark:text-emerald-400" />
+          <span>{isLabour ? (isHindi ? "कार्य पूर्णता कोड (Completion OTP)" : "Worker Completion OTP") : t("bookings.completionOtp", "Work completion OTP")}</span>
+        </div>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 dark:border-emerald-700 dark:bg-slate-900 dark:text-emerald-200"
+        >
+          {copied ? (isHindi ? "कॉपी हो गया!" : "Copied!") : (isHindi ? "OTP कॉपी करें" : "Copy OTP")}
+        </button>
       </div>
-      <p className="mt-2 text-3xl font-black tracking-[0.35em]">{otp}</p>
-      <p className="mt-2 text-xs font-semibold">
-        {t(
-          "bookings.shareOtp",
-          "Share this OTP with the Driver only after the work is complete."
-        )}
+      <div className="mt-3 flex items-center justify-between">
+        <p className="font-mono text-3xl font-black tracking-[0.4em] text-emerald-900 dark:text-emerald-100">{otp}</p>
+      </div>
+      <p className="mt-2 text-xs font-medium text-emerald-800/90 dark:text-emerald-300">
+        ⚠️ {isHindi
+          ? `काम पूरा होने के बाद ही यह OTP ${isLabour ? "लेबर / वर्कर" : "ड्राइवर"} को बताएं।`
+          : `Share this OTP with the ${isLabour ? "worker" : "driver"} ONLY after the work is fully finished.`}
       </p>
     </div>
   );
@@ -488,10 +510,18 @@ function InlineAlternativeMachines({ booking, allBookings, onBookingSuccess }) {
   );
 }
 
-function BookingCard({ booking, type, onCancel, allBookings, onBookingSuccess }) {
+function BookingCard({ booking, type, onCancel, allBookings, onBookingSuccess, isHighlighted = false }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    if (isHighlighted && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [isHighlighted]);
+
   const isGroup = type === "Group";
   const isLabour = booking.requestType === "Labour";
   const title = isGroup
@@ -575,7 +605,14 @@ function BookingCard({ booking, type, onCancel, allBookings, onBookingSuccess })
     booking.status === "Cancelled";
 
   return (
-    <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900">
+    <article
+      ref={cardRef}
+      className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:bg-slate-900 ${
+        isHighlighted
+          ? "border-green-600 ring-4 ring-green-600/30 shadow-lg shadow-green-700/10"
+          : "border-slate-200 dark:border-slate-800"
+      }`}
+    >
       <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5 dark:border-slate-800 sm:p-6">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300">
@@ -698,7 +735,7 @@ function BookingCard({ booking, type, onCancel, allBookings, onBookingSuccess })
           <section className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
             <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2.5 dark:border-emerald-900/40">
               <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
-                {t("bookings.yourDriver", "YOUR DRIVER")}
+                {isLabour ? "YOUR WORKER / LABOUR" : t("bookings.yourDriver", "YOUR DRIVER")}
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
                 <CheckCircle2 size={12} />
@@ -775,7 +812,7 @@ function BookingCard({ booking, type, onCancel, allBookings, onBookingSuccess })
               </div>
             </div>
 
-            {/* Action Buttons: [Call Driver] & [Chat on WorkShetu] */}
+            {/* Action Buttons: [Call Driver/Worker] & [Chat on WorkShetu] */}
             <div className="mt-3.5 flex flex-wrap items-center gap-2.5 border-t border-emerald-200/60 pt-3 dark:border-emerald-900/40">
               {driverPhone && (
                 <a
@@ -783,7 +820,7 @@ function BookingCard({ booking, type, onCancel, allBookings, onBookingSuccess })
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-95"
                 >
                   <Phone size={14} />
-                  {t("bookings.callDriver", "Call Driver")}
+                  {isLabour ? "Call Worker" : t("bookings.callDriver", "Call Driver")}
                 </a>
               )}
 
@@ -795,26 +832,31 @@ function BookingCard({ booking, type, onCancel, allBookings, onBookingSuccess })
         {booking.status === "Accepted" && (
           <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900 dark:bg-blue-950/20">
             <p className="text-sm font-black text-blue-900 dark:text-blue-200">
-              {t("bookings.driverAccepted", "Driver has accepted your request")}
+              {isLabour ? "Worker has accepted your request" : t("bookings.driverAccepted", "Driver has accepted your request")}
             </p>
             <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
-              {t(
-                "bookings.acceptedHelp",
-                "Use the location action to view the machine route. Share the OTP only after the work is finished."
-              )}
+              {isLabour
+                ? "The worker has been scheduled. Share the OTP below only after the work is completely done."
+                : t(
+                    "bookings.acceptedHelp",
+                    "Use the location action to view the machine route. Share the OTP only after the work is finished."
+                  )}
             </p>
-            <div className="mt-3">
-              <DirectionsLink
-                latitude={machine?.latitude}
-                longitude={machine?.longitude}
-              />
-            </div>
+            {!isLabour && (
+              <div className="mt-3">
+                <DirectionsLink
+                  latitude={machine?.latitude}
+                  longitude={machine?.longitude}
+                />
+              </div>
+            )}
           </div>
         )}
 
         {booking.status === "Accepted" && (
           <CompletionCode
             otp={isGroup ? currentMember?.completionOtp : booking.completionOtp}
+            isLabour={isLabour}
           />
         )}
 
@@ -911,32 +953,417 @@ function BookingCard({ booking, type, onCancel, allBookings, onBookingSuccess })
   );
 }
 
+function LabourBookingCard({ booking, onRefresh, isHighlighted = false }) {
+  const { i18n } = useTranslation();
+  const navigate = useNavigate();
+  const [cancelling, setCancelling] = useState(false);
+  const [copiedOtp, setCopiedOtp] = useState(false);
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    if (isHighlighted && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [isHighlighted]);
+
+  const isPending = booking.status === "Pending";
+  const isAccepted = booking.status === "Accepted";
+  const isCompleted = booking.status === "Completed";
+  const isRejectedOrCancelled = ["Rejected", "Cancelled", "Expired"].includes(booking.status);
+
+  const handleCancel = async () => {
+    if (!window.confirm("Are you sure you want to cancel this labour booking request?")) return;
+    try {
+      setCancelling(true);
+      await axios.put(`/api/labour/bookings/${booking._id}/cancel`, {}, { withCredentials: true });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to cancel booking.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleCopyOtp = () => {
+    if (!booking.completionOtp) return;
+    try {
+      navigator.clipboard?.writeText(String(booking.completionOtp));
+      setCopiedOtp(true);
+      setTimeout(() => setCopiedOtp(false), 2000);
+    } catch (e) {}
+  };
+
+  const isWorkerUnavailable = Boolean(
+    booking.workerProfileUnavailable ||
+    (!booking.workerName && !booking.itemId?.name && !booking.owner?.fullName) ||
+    booking.workerName === "Worker profile unavailable"
+  );
+  const workerImage = booking.workerImage || booking.itemId?.image?.url || booking.itemId?.image || booking.owner?.profileImage?.url;
+  const workerName = isWorkerUnavailable
+    ? "Worker profile unavailable"
+    : (booking.workerName || booking.itemId?.name || booking.owner?.fullName || "Worker profile unavailable");
+  const workerSkill = booking.workerSkill || booking.itemId?.labourType || booking.itemId?.category || booking.taskCategory || "Labour Service";
+  const bookingDateStr = booking.bookingDate
+    ? new Date(booking.bookingDate).toLocaleDateString(
+        i18n.language?.startsWith("hi") ? "hi-IN" : "en-IN",
+        { weekday: "short", day: "numeric", month: "short", year: "numeric" }
+      )
+    : "N/A";
+
+  const totalAmount = booking.finalPrice || booking.totalPrice || 0;
+  const dailyRate = booking.unitPrice || (booking.daysRequired ? Math.round(totalAmount / booking.daysRequired) : totalAmount);
+
+  return (
+    <article
+      ref={cardRef}
+      className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition-all duration-300 hover:shadow-md dark:bg-slate-900 flex flex-col justify-between ${
+        isHighlighted
+          ? "border-emerald-500 ring-4 ring-emerald-500/30 shadow-lg shadow-emerald-700/10"
+          : "border-slate-200 dark:border-slate-800"
+      }`}
+    >
+      <div className="p-5">
+        {/* Top Header: Category, Reference & Status */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+              <HardHat size={15} />
+            </span>
+            <span className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+              Labour Booking
+            </span>
+            <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {booking.reference || `#LB-${String(booking._id).slice(-6).toUpperCase()}`}
+            </span>
+            {isHighlighted && (
+              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                New Booking
+              </span>
+            )}
+          </div>
+
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
+              isAccepted
+                ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                : isCompleted
+                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                : isPending
+                ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+            }`}
+          >
+            {isAccepted ? <CheckCircle2 size={13} /> : isPending ? <Clock size={13} /> : isCompleted ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+            {booking.status}
+          </span>
+        </div>
+
+        {/* Worker Info */}
+        <div className="mt-4 flex items-start gap-3.5">
+          {workerImage ? (
+            <img
+              src={workerImage}
+              alt={workerName}
+              className="h-14 w-14 rounded-2xl object-cover ring-2 ring-emerald-200 dark:ring-emerald-800 shrink-0"
+            />
+          ) : (
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-black text-emerald-800 ring-2 ring-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:ring-emerald-800">
+              {workerName ? workerName.slice(0, 2).toUpperCase() : <UserRound size={22} />}
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-base font-black text-slate-900 dark:text-white">
+              {workerName}
+            </h3>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                {workerSkill}
+              </span>
+              {isWorkerUnavailable && (
+                <span className="inline-flex items-center rounded-lg bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                  Profile unavailable
+                </span>
+              )}
+              {booking.workerLocation && (
+                <span className="flex items-center gap-1 text-xs text-slate-500">
+                  <MapPin size={12} className="shrink-0" />
+                  <span className="truncate">{booking.workerLocation}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Work Details Grid */}
+        <div className="mt-4 grid grid-cols-2 gap-2.5 rounded-2xl bg-slate-50 p-3.5 text-xs dark:bg-slate-800/60">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Booking Date</span>
+            <p className="mt-0.5 font-bold text-slate-800 dark:text-slate-200">{bookingDateStr}</p>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Duration</span>
+            <p className="mt-0.5 font-bold text-slate-800 dark:text-slate-200">{booking.daysRequired || 1} Day(s)</p>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Preferred Time</span>
+            <p className="mt-0.5 font-semibold text-slate-700 dark:text-slate-300">{booking.preferredTime || "Standard hours"}</p>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Daily Wage</span>
+            <p className="mt-0.5 font-semibold text-slate-700 dark:text-slate-300">₹{dailyRate} / Day</p>
+          </div>
+          {booking.customerLocation && (
+            <div className="col-span-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Work Location</span>
+              <p className="mt-0.5 flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                <MapPin size={12} className="shrink-0 text-slate-400" />
+                {booking.customerLocation}
+              </p>
+            </div>
+          )}
+          {booking.taskDescription && (
+            <div className="col-span-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Task Details</span>
+              <p className="mt-0.5 italic text-slate-600 dark:text-slate-300">"{booking.taskDescription}"</p>
+            </div>
+          )}
+        </div>
+
+        {/* Wage Summary */}
+        <div className="mt-3.5 flex items-center justify-between rounded-xl bg-emerald-50/70 px-4 py-2.5 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-200">
+          <span className="text-xs font-bold">Total Estimated Wage:</span>
+          <span className="text-base font-black text-emerald-800 dark:text-emerald-300">₹{totalAmount}</span>
+        </div>
+
+        {/* ── CUSTOMER LABOUR OTP CARD ── */}
+        {isAccepted && (
+          <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/80 p-4 text-blue-950 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-blue-800 dark:text-blue-300">
+                <ShieldCheck size={17} className="text-blue-600 dark:text-blue-400" />
+                <span>Work Completion OTP</span>
+              </div>
+              {booking.completionOtp && (
+                <button
+                  type="button"
+                  onClick={handleCopyOtp}
+                  className="rounded-lg border border-blue-300 bg-white px-2.5 py-1 text-xs font-bold text-blue-800 shadow-2xs hover:bg-blue-100 dark:border-blue-700 dark:bg-slate-900 dark:text-blue-200"
+                >
+                  {copiedOtp ? "Copied!" : "Copy OTP"}
+                </button>
+              )}
+            </div>
+
+            {booking.completionOtp ? (
+              <div className="mt-2.5">
+                <p className="font-mono text-3xl font-black tracking-[0.45em] text-blue-950 dark:text-blue-100">
+                  {booking.completionOtp}
+                </p>
+                <p className="mt-2 text-xs font-semibold text-blue-800 dark:text-blue-300">
+                  ⚠️ Share this OTP with the worker only after the work has been completed.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs font-medium text-blue-700 dark:text-blue-300">
+                The completion OTP will appear here once the worker requests work completion verification.
+              </p>
+            )}
+          </div>
+        )}
+
+        {isCompleted && (
+          <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-slate-100 p-3.5 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <CheckCircle2 size={17} className="text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <p>Work completed successfully. OTP verified.</p>
+              {booking.completedAt && (
+                <p className="text-[11px] font-normal text-slate-500 mt-0.5">
+                  Completed on {new Date(booking.completedAt).toLocaleString()}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {isRejectedOrCancelled && (
+          <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-rose-50 p-3.5 text-xs font-bold text-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
+            <XCircle size={17} className="text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <p>{booking.status === "Cancelled" ? "This booking request was cancelled." : "The worker was unavailable to accept this request."}</p>
+              {booking.cancellationReason && (
+                <p className="text-[11px] font-normal text-rose-600 mt-0.5">Reason: {booking.cancellationReason}</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Action Footer */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex items-center gap-2">
+          {/* Call button visible ONLY when status is Accepted or Completed */}
+          {["Accepted", "Completed"].includes(booking.status) && booking.workerPhone ? (
+            <a
+              href={`tel:${booking.workerPhone}`}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-800"
+            >
+              <Phone size={13} />
+              Call Worker
+            </a>
+          ) : null}
+
+          {["Accepted", "Completed"].includes(booking.status) && (
+            <button
+              type="button"
+              onClick={() => navigate("/chat", { state: { bookingId: booking._id, title: `Chat with ${workerName}` } })}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <MessageCircle size={13} />
+              Chat
+            </button>
+          )}
+        </div>
+
+        {isPending && (
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300 disabled:opacity-50"
+          >
+            {cancelling ? "Cancelling..." : "Cancel Request"}
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
+
 function MyBooking() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const isAdmin = user?.isAdmin === true || String(user?.role || "").trim().toLowerCase() === "admin";
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const rawTypeParam = (searchParams.get("type") || searchParams.get("tab") || "").toLowerCase();
+  const typeParam = rawTypeParam === "labour" ? "labour" : (rawTypeParam === "machine" || rawTypeParam === "machines") ? "machine" : "";
+  const highlightBookingId = searchParams.get("highlight");
+
+  // Primary Tab: "machines" | "labour"
+  const [activeTab, setActiveTab] = useState(() => {
+    return typeParam === "labour" ? "labour" : "machines";
+  });
+
+  // Keep activeTab in sync with URL searchParams (e.g. back/forward navigation or link changes)
+  useEffect(() => {
+    if (typeParam === "labour" && activeTab !== "labour") {
+      setActiveTab("labour");
+    } else if (typeParam === "machine" && activeTab !== "machines") {
+      setActiveTab("machines");
+    }
+  }, [typeParam]);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    const nextParams = new URLSearchParams(location.search);
+    const normalized = newTab === "labour" ? "labour" : "machine";
+    nextParams.set("type", normalized);
+    nextParams.set("tab", normalized);
+    navigate({ search: nextParams.toString() }, { replace: true });
+  };
+
+  // Machine Data States
   const [groups, setGroups] = useState([]);
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [section, setSection] = useState(() =>
-    location.pathname.endsWith("/rejected") ? "rejected" : "active"
+  const [machineBookings, setMachineBookings] = useState([]);
+  const [machineLoading, setMachineLoading] = useState(true);
+  const [machineError, setMachineError] = useState("");
+  const [machineSection, setMachineSection] = useState(() =>
+    location.pathname.endsWith("/rejected") ? "rejected" : "all"
   );
 
-  const cancelBooking = async (booking) => {
-    if (
-      !window.confirm(
-        t("bookings.cancelConfirm", "Are you sure you want to cancel this booking?")
-      )
-    )
-      return;
+  // Labour Data States
+  const [labourBookings, setLabourBookings] = useState([]);
+  const [labourLoading, setLabourLoading] = useState(true);
+  const [labourError, setLabourError] = useState("");
+  const [labourSection, setLabourSection] = useState("all");
+
+  const isRejectedStatus = (status) =>
+    ["Rejected", "Cancelled", "Expired"].includes(status);
+
+  // Load Machine Bookings
+  const loadMachineBookings = useCallback(async ({ silent = false } = {}) => {
     try {
-      const isGroup =
-        booking.bookingType === "Group" ||
-        booking.groupBookingId ||
-        booking.members;
+      if (!silent) setMachineLoading(true);
+      const response = await axios.get("/api/group-bookings/my/requests", {
+        withCredentials: true,
+      });
+      setGroups(response.data?.groups || []);
+      setMachineBookings(response.data?.bookings || []);
+      setMachineError("");
+    } catch (err) {
+      setMachineError(err.response?.data?.message || "Machine bookings could not be loaded.");
+    } finally {
+      if (!silent) setMachineLoading(false);
+    }
+  }, []);
+
+  // Load Labour Bookings
+  const loadLabourBookings = useCallback(async ({ silent = false } = {}) => {
+    try {
+      if (!silent) setLabourLoading(true);
+      const response = await axios.get("/api/labour/bookings", {
+        withCredentials: true,
+      });
+      setLabourBookings(response.data?.bookings || []);
+      setLabourError("");
+    } catch (err) {
+      setLabourError(err.response?.data?.message || "Labour bookings could not be loaded.");
+    } finally {
+      if (!silent) setLabourLoading(false);
+    }
+  }, []);
+
+  const refreshAll = () => {
+    loadMachineBookings();
+    loadLabourBookings();
+  };
+
+  useEffect(() => {
+    loadMachineBookings();
+    loadLabourBookings();
+    const refreshTimer = window.setInterval(() => {
+      loadMachineBookings({ silent: true });
+      loadLabourBookings({ silent: true });
+    }, 12000);
+    return () => window.clearInterval(refreshTimer);
+  }, [loadMachineBookings, loadLabourBookings]);
+
+  // Intelligent auto-switch to Labour tab if customer only has Labour bookings
+  const autoSwitchedTabRef = useRef(false);
+  useEffect(() => {
+    if (autoSwitchedTabRef.current) return;
+    const params = new URLSearchParams(location.search);
+    const hasTypeParam = params.get("type") || params.get("tab");
+    if (hasTypeParam) {
+      autoSwitchedTabRef.current = true;
+      return;
+    }
+    if (!machineLoading && !labourLoading) {
+      autoSwitchedTabRef.current = true;
+      if (groups.length === 0 && machineBookings.length === 0 && labourBookings.length > 0) {
+        setActiveTab("labour");
+      }
+    }
+  }, [machineLoading, labourLoading, groups.length, machineBookings.length, labourBookings.length, location.search]);
+
+  // Cancel Machine Booking
+  const cancelMachineBooking = async (booking) => {
+    if (!window.confirm(t("bookings.cancelConfirm", "Are you sure you want to cancel this booking?"))) return;
+    try {
+      const isGroup = booking.bookingType === "Group" || booking.groupBookingId || booking.members;
       const bookingId = isGroup
         ? booking.members?.find((member) => member.booking)?.booking
         : booking._id;
@@ -946,99 +1373,79 @@ function MyBooking() {
         {},
         { withCredentials: true }
       );
-      await loadBookings();
+      await loadMachineBookings();
     } catch (requestError) {
-      setError(
-        requestError.response?.data?.message ||
-          t("bookings.cancelError", "Booking could not be cancelled.")
-      );
+      setMachineError(requestError.response?.data?.message || t("bookings.cancelError", "Booking could not be cancelled."));
     }
   };
 
-  const loadBookings = useCallback(async ({ silent = false } = {}) => {
-    try {
-      if (!silent) setLoading(true);
-      const response = await axios.get("/api/group-bookings/my/requests", {
-        withCredentials: true,
-      });
-      setGroups(response.data?.groups || []);
-      setBookings(response.data?.bookings || []);
-      setError("");
-    } catch (requestError) {
-      setError(
-        requestError.response?.data?.message ||
-          i18n.t("bookings.loadError", "Bookings could not be loaded.")
-      );
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
+  // Filtered Machine Lists
+  const completedGroups = groups.filter((g) => g.status === "Completed");
+  const rejectedGroups = groups.filter((g) => isRejectedStatus(g.status));
+  const activeGroups = groups.filter((g) => g.status !== "Completed" && !isRejectedStatus(g.status));
 
-  useEffect(() => {
-    loadBookings();
-    const refreshTimer = window.setInterval(
-      () => loadBookings({ silent: true }),
-      10000
-    );
-    return () => window.clearInterval(refreshTimer);
-  }, [loadBookings]);
+  const completedMachines = machineBookings.filter((b) => b.status === "Completed");
+  const rejectedMachines = machineBookings.filter((b) => isRejectedStatus(b.status));
+  const activeMachines = machineBookings.filter((b) => b.status !== "Completed" && !isRejectedStatus(b.status));
 
-  const isRejectedStatus = (status) =>
-    ["Rejected", "Cancelled", "Expired"].includes(status);
-  const completedGroups = groups.filter((group) => group.status === "Completed");
-  const rejectedGroups = groups.filter((group) => isRejectedStatus(group.status));
-  const activeGroups = groups.filter(
-    (group) => group.status !== "Completed" && !isRejectedStatus(group.status)
-  );
-  const completedBookings = bookings.filter(
-    (booking) =>
-      booking.status === "Completed" && booking.bookingType !== "Group"
-  );
-  const rejectedBookings = bookings.filter((booking) =>
-    isRejectedStatus(booking.status)
-  );
-  const activeBookings = bookings.filter(
-    (booking) =>
-      booking.status !== "Completed" && !isRejectedStatus(booking.status)
-  );
   const shownGroups =
-    section === "completed"
+    machineSection === "completed"
       ? completedGroups
-      : section === "rejected"
+      : machineSection === "rejected"
       ? rejectedGroups
-      : activeGroups;
-  const shownBookings =
-    section === "completed"
-      ? completedBookings
-      : section === "rejected"
-      ? rejectedBookings
-      : activeBookings;
-  const completedCount = completedGroups.length + completedBookings.length;
-  const rejectedCount = rejectedGroups.length + rejectedBookings.length;
+      : machineSection === "active"
+      ? activeGroups
+      : groups;
+
+  const shownMachines =
+    machineSection === "completed"
+      ? completedMachines
+      : machineSection === "rejected"
+      ? rejectedMachines
+      : machineSection === "active"
+      ? activeMachines
+      : machineBookings;
+
+  // Filtered Labour Lists
+  const pendingLabour = labourBookings.filter((b) => b.status === "Pending");
+  const acceptedLabour = labourBookings.filter((b) => b.status === "Accepted");
+  const completedLabour = labourBookings.filter((b) => b.status === "Completed");
+  const rejectedLabour = labourBookings.filter((b) => isRejectedStatus(b.status));
+
+  const shownLabour =
+    labourSection === "pending"
+      ? pendingLabour
+      : labourSection === "accepted"
+      ? acceptedLabour
+      : labourSection === "completed"
+      ? completedLabour
+      : labourSection === "rejected"
+      ? rejectedLabour
+      : labourBookings;
+
+  const totalMachineCount = groups.length + machineBookings.length;
+  const totalLabourCount = labourBookings.length;
+  const isLoading = machineLoading && labourLoading;
 
   return (
-    <main className="min-h-screen bg-[#f6f8f3] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <main className="min-h-screen bg-[#f6f8f3] text-slate-900 dark:bg-slate-950 dark:text-slate-100 pb-20">
       <Navbar />
+
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Page Header */}
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700 dark:text-lime-300">
-              {isAdmin
-                ? "Admin Personal Account"
-                : t("bookings.workspace", "Farmer workspace")}
+              {isAdmin ? "Admin Personal Account" : "Central Booking Management"}
             </p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight">
-              {isAdmin ? "My Personal Bookings" : t("bookings.title", "My bookings")}
+            <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+              My Bookings
             </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              {isAdmin
-                ? "Personal reservations created under your account. Platform-wide bookings are managed separately in the Admin Dashboard."
-                : t(
-                    "bookings.subtitle",
-                    "Track every request, acceptance, live status, and work completion in one place."
-                  )}
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Manage your Machine and Labour bookings in one place.
             </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-2.5">
             {isAdmin && (
               <Link
@@ -1049,167 +1456,351 @@ function MyBooking() {
                 Manage Platform Bookings
               </Link>
             )}
+
             <button
               type="button"
-              onClick={() => loadBookings()}
-              disabled={loading}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#123524] px-4 text-sm font-black text-white transition hover:bg-[#176b3a] disabled:opacity-60"
+              onClick={refreshAll}
+              disabled={isLoading}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#123524] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#176b3a] disabled:opacity-60"
             >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
               {t("common.refresh", "Refresh")}
             </button>
           </div>
         </header>
 
-        {error && (
-          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-            {error}
-          </div>
-        )}
-
-        {loading && (
-          <div className="mt-8 rounded-3xl bg-white p-12 text-center dark:bg-slate-900">
-            {t("bookings.loading", "Loading bookings...")}
-          </div>
-        )}
-
-        {!loading && (groups.length > 0 || bookings.length > 0) && (
-          <section className="mt-8 grid gap-3 sm:grid-cols-4">
-            <SummaryCard
-              label={t("bookings.total", "Total bookings")}
-              value={groups.length + bookings.length}
-            />
-            <SummaryCard
-              label={t("driver.status.Accepted", "Accepted")}
-              value={
-                [...groups, ...bookings].filter(
-                  (booking) => booking.status === "Accepted"
-                ).length
-              }
-              tone="green"
-            />
-            <SummaryCard
-              label={t("driver.status.Completed", "Completed")}
-              value={completedCount}
-              tone="slate"
-            />
-            <SummaryCard
-              label={t("driver.status.Rejected", "Rejected / Expired")}
-              value={rejectedCount}
-              tone="red"
-            />
-          </section>
-        )}
-
-        {!loading && (groups.length > 0 || bookings.length > 0) && (
-          <nav
-            className="mt-8 flex gap-2 rounded-2xl bg-slate-100 p-1.5 dark:bg-slate-900"
-            aria-label={t("bookings.sectionsLabel", "Booking sections")}
+        {/* ── TWO PRIMARY CENTRAL TABS: MACHINE BOOKINGS & LABOUR BOOKINGS ── */}
+        <div className="mt-8 flex rounded-2xl bg-slate-200/80 p-1.5 dark:bg-slate-900">
+          <button
+            type="button"
+            onClick={() => handleTabChange("machines")}
+            className={`flex flex-1 items-center justify-center gap-2.5 rounded-xl py-3 text-sm font-black transition-all ${
+              activeTab === "machines"
+                ? "bg-white text-green-900 shadow-sm dark:bg-slate-800 dark:text-lime-300"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            }`}
           >
-            <button
-              type="button"
-              onClick={() => setSection("active")}
-              aria-pressed={section === "active"}
-              className={`min-h-11 flex-1 rounded-xl px-4 text-sm font-black transition ${
-                section === "active"
-                  ? "bg-white text-green-800 shadow-sm dark:bg-slate-800 dark:text-lime-300"
-                  : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
+            <Tractor size={18} />
+            <span>Machine Bookings</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                activeTab === "machines"
+                  ? "bg-green-100 text-green-800 dark:bg-lime-950 dark:text-lime-300"
+                  : "bg-slate-300/80 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
               }`}
             >
-              {t("bookings.activeSection", "Active")}{" "}
-              <span className="ml-1 opacity-70">
-                {activeGroups.length + activeBookings.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSection("completed")}
-              aria-pressed={section === "completed"}
-              className={`min-h-11 flex-1 rounded-xl px-4 text-sm font-black transition ${
-                section === "completed"
-                  ? "bg-white text-green-800 shadow-sm dark:bg-slate-800 dark:text-lime-300"
-                  : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
-              }`}
-            >
-              {t("bookings.completedSection", "Completed")}{" "}
-              <span className="ml-1 opacity-70">{completedCount}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSection("rejected")}
-              aria-pressed={section === "rejected"}
-              className={`min-h-11 flex-1 rounded-xl px-4 text-sm font-black transition ${
-                section === "rejected"
-                  ? "bg-white text-red-700 shadow-sm dark:bg-slate-800 dark:text-red-300"
-                  : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
-              }`}
-            >
-              {t("bookings.rejectedSection", "Rejected & Expired")}{" "}
-              <span className="ml-1 opacity-70">{rejectedCount}</span>
-            </button>
-          </nav>
-        )}
+              {totalMachineCount}
+            </span>
+          </button>
 
-        {!loading && groups.length === 0 && bookings.length === 0 && (
-          <div className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
-            {t("bookings.empty", "No bookings found.")}
-          </div>
-        )}
+          <button
+            type="button"
+            onClick={() => handleTabChange("labour")}
+            className={`flex flex-1 items-center justify-center gap-2.5 rounded-xl py-3 text-sm font-black transition-all ${
+              activeTab === "labour"
+                ? "bg-white text-emerald-900 shadow-sm dark:bg-slate-800 dark:text-emerald-300"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            }`}
+          >
+            <HardHat size={18} />
+            <span>Labour Bookings</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                activeTab === "labour"
+                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                  : "bg-slate-300/80 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+              }`}
+            >
+              {totalLabourCount}
+            </span>
+          </button>
+        </div>
 
-        {!loading && section === "completed" && (
-          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-            {t(
-              "bookings.completedAutoDelete",
-              "Completed requests are automatically preserved in work history."
+        {/* ══════════════════════════════════════════════════
+            SECTION A: MACHINE BOOKINGS
+        ══════════════════════════════════════════════════ */}
+        {activeTab === "machines" && (
+          <div className="mt-6">
+            {machineError && (
+              <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                {machineError}
+              </div>
             )}
-          </div>
-        )}
+            {/* Machine Filter Pills */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <nav className="flex flex-wrap gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-900" aria-label="Machine Booking Filters">
+                <button
+                  type="button"
+                  onClick={() => setMachineSection("all")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                    machineSection === "all"
+                      ? "bg-white text-slate-900 shadow-xs dark:bg-slate-800 dark:text-white"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  All ({totalMachineCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMachineSection("active")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                    machineSection === "active"
+                      ? "bg-white text-green-800 shadow-xs dark:bg-slate-800 dark:text-lime-300"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  Active ({activeGroups.length + activeMachines.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMachineSection("completed")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                    machineSection === "completed"
+                      ? "bg-white text-green-800 shadow-xs dark:bg-slate-800 dark:text-lime-300"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  Completed ({completedGroups.length + completedMachines.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMachineSection("rejected")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                    machineSection === "rejected"
+                      ? "bg-white text-rose-700 shadow-xs dark:bg-slate-800 dark:text-rose-300"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  Rejected & Expired ({rejectedGroups.length + rejectedMachines.length})
+                </button>
+              </nav>
 
-        {!loading && section === "rejected" && (
-          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
-            {t(
-              "bookings.rejectedAlternativesHint",
-              "Unconfirmed or expired requests can be rebooked instantly with nearby alternative machines."
-            )}
-          </div>
-        )}
-
-        <section className="mt-8 grid gap-5 lg:grid-cols-2">
-          {shownGroups.map((group) => (
-            <BookingCard
-              key={group._id}
-              booking={group}
-              type="Group"
-              onCancel={section === "active" ? cancelBooking : undefined}
-            />
-          ))}
-          {shownBookings.map((booking) => (
-            <BookingCard
-              key={booking._id}
-              booking={booking}
-              type="Fast"
-              onCancel={section === "active" ? cancelBooking : undefined}
-              allBookings={bookings}
-              onBookingSuccess={() => {
-                loadBookings();
-                setSection("active");
-              }}
-            />
-          ))}
-        </section>
-
-        {!loading &&
-          (groups.length > 0 || bookings.length > 0) &&
-          shownGroups.length === 0 &&
-          shownBookings.length === 0 && (
-            <div className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
-              {section === "completed"
-                ? t("bookings.completedEmpty", "No completed requests yet.")
-                : section === "rejected"
-                ? t("bookings.rejectedEmpty", "No rejected or expired requests.")
-                : t("bookings.activeEmpty", "No active requests.")}
+              <Link
+                to="/machine"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 hover:underline dark:text-lime-400"
+              >
+                <Tractor size={14} />
+                Explore Machinery Marketplace →
+              </Link>
             </div>
-          )}
+
+            {/* Machine Loading Skeleton */}
+            {machineLoading && (
+              <div className="mt-6 grid gap-5 lg:grid-cols-2">
+                {[1, 2].map((i) => (
+                  <div key={i} className="h-64 animate-pulse rounded-3xl bg-slate-200/80 dark:bg-slate-800/60" />
+                ))}
+              </div>
+            )}
+
+            {/* Machine Empty State */}
+            {!machineLoading && totalMachineCount === 0 && (
+              <div className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100 text-green-800 dark:bg-green-950 dark:text-lime-300">
+                  <Tractor size={28} />
+                </div>
+                <h3 className="mt-4 text-base font-black text-slate-900 dark:text-white">
+                  You haven't booked any machines yet.
+                </h3>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                  Find tractors, harvesters, rotavators, and cultivators available around your village.
+                </p>
+                <Link
+                  to="/machine"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-green-700 px-5 py-2.5 text-xs font-black text-white hover:bg-green-800 transition shadow-sm"
+                >
+                  <Tractor size={15} />
+                  Explore Machinery Marketplace
+                </Link>
+              </div>
+            )}
+
+            {/* Machine Cards Grid */}
+            {!machineLoading && (shownGroups.length > 0 || shownMachines.length > 0) && (
+              <section className="mt-6 grid gap-5 lg:grid-cols-2">
+                {shownGroups.map((group) => (
+                  <BookingCard
+                    key={group._id}
+                    booking={group}
+                    type="Group"
+                    isHighlighted={highlightBookingId === String(group._id)}
+                    onCancel={machineSection === "active" ? cancelMachineBooking : undefined}
+                  />
+                ))}
+                {shownMachines.map((booking) => (
+                  <BookingCard
+                    key={booking._id}
+                    booking={booking}
+                    type="Fast"
+                    isHighlighted={highlightBookingId === String(booking._id)}
+                    onCancel={machineSection === "active" ? cancelMachineBooking : undefined}
+                    allBookings={machineBookings}
+                    onBookingSuccess={() => {
+                      loadMachineBookings();
+                      setMachineSection("active");
+                    }}
+                  />
+                ))}
+              </section>
+            )}
+
+            {/* Section Specific Filter Empty */}
+            {!machineLoading && totalMachineCount > 0 && shownGroups.length === 0 && shownMachines.length === 0 && (
+              <div className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-800 dark:bg-slate-900">
+                <p className="text-sm font-bold text-slate-500">
+                  {machineSection === "completed"
+                    ? "No completed machine requests yet."
+                    : machineSection === "rejected"
+                    ? "No rejected or expired machine requests."
+                    : "No active machine requests."}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════
+            SECTION B: LABOUR BOOKINGS
+        ══════════════════════════════════════════════════ */}
+        {activeTab === "labour" && (
+          <div className="mt-6">
+            {labourError && (
+              <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                {labourError}
+              </div>
+            )}
+            {/* Labour Filter Pills */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <nav className="flex flex-wrap gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-900" aria-label="Labour Booking Filters">
+                <button
+                  type="button"
+                  onClick={() => setLabourSection("all")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                    labourSection === "all"
+                      ? "bg-white text-slate-900 shadow-xs dark:bg-slate-800 dark:text-white"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  All ({totalLabourCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLabourSection("pending")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                    labourSection === "pending"
+                      ? "bg-white text-amber-800 shadow-xs dark:bg-slate-800 dark:text-amber-300"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  Pending ({pendingLabour.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLabourSection("accepted")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                    labourSection === "accepted"
+                      ? "bg-white text-blue-800 shadow-xs dark:bg-slate-800 dark:text-blue-300"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  Accepted ({acceptedLabour.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLabourSection("completed")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                    labourSection === "completed"
+                      ? "bg-white text-emerald-800 shadow-xs dark:bg-slate-800 dark:text-emerald-300"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  Completed ({completedLabour.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLabourSection("rejected")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-black transition ${
+                    labourSection === "rejected"
+                      ? "bg-white text-rose-700 shadow-xs dark:bg-slate-800 dark:text-rose-300"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  Rejected / Cancelled ({rejectedLabour.length})
+                </button>
+              </nav>
+
+              <Link
+                to="/Labour"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:underline dark:text-emerald-400"
+              >
+                <HardHat size={14} />
+                Explore Farm Labour Marketplace →
+              </Link>
+            </div>
+
+            {/* Labour Loading Skeleton */}
+            {labourLoading && (
+              <div className="mt-6 grid gap-5 lg:grid-cols-2">
+                {[1, 2].map((i) => (
+                  <div key={i} className="h-64 animate-pulse rounded-3xl bg-slate-200/80 dark:bg-slate-800/60" />
+                ))}
+              </div>
+            )}
+
+            {/* Labour Empty State */}
+            {!labourLoading && totalLabourCount === 0 && (
+              <div className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  <HardHat size={28} />
+                </div>
+                <h3 className="mt-4 text-base font-black text-slate-900 dark:text-white">
+                  You haven't booked any workers yet.
+                </h3>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                  Hire verified mistris, farm labourers, beldars, and tractor drivers on daily wages.
+                </p>
+                <Link
+                  to="/Labour"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-black text-white hover:bg-emerald-800 transition shadow-sm"
+                >
+                  <HardHat size={15} />
+                  Explore Farm Labour Marketplace
+                </Link>
+              </div>
+            )}
+
+            {/* Labour Cards Grid */}
+            {!labourLoading && shownLabour.length > 0 && (
+              <section className="mt-6 grid gap-5 lg:grid-cols-2">
+                {shownLabour.map((b) => (
+                  <LabourBookingCard
+                    key={b._id}
+                    booking={b}
+                    isHighlighted={highlightBookingId === String(b._id)}
+                    onRefresh={loadLabourBookings}
+                  />
+                ))}
+              </section>
+            )}
+
+            {/* Labour Filter Specific Empty */}
+            {!labourLoading && totalLabourCount > 0 && shownLabour.length === 0 && (
+              <div className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-800 dark:bg-slate-900">
+                <p className="text-sm font-bold text-slate-500">
+                  {labourSection === "completed"
+                    ? "No completed labour requests yet."
+                    : labourSection === "rejected"
+                    ? "No rejected or cancelled labour requests."
+                    : labourSection === "pending"
+                    ? "No pending labour requests."
+                    : labourSection === "accepted"
+                    ? "No accepted labour bookings currently active."
+                    : "No labour bookings found for this filter."}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );

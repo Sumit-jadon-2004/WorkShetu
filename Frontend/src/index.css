@@ -8,7 +8,6 @@ html {
 
 body {
   margin: 0;
-  min-width: 320px;
   font-family: Arial, Helvetica, sans-serif;
   background: #f8fafc;
   color: #0f172a;
@@ -89,4 +88,22 @@ body.dark input,
 body.dark select {
   color: #f1f5f9;
   background-color: #1e293b;
+}
+
+
+/* Leaflet Interactive Map Global Styles */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 1 !important;
+  position: relative !important;
+}
+
+.leaflet-pane {
+  z-index: 1 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 2 !important;
 }

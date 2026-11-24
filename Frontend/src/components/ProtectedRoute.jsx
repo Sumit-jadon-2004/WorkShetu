@@ -18,7 +18,7 @@ function ProtectedRoute({ children, roles }) {
     }
     if (targetRole === "driver") {
       if (isUserAdmin) return true;
-      return userRole === "driver" && user.driverApplicationStatus === "Approved" && user.isActive !== false;
+      return user.driverApplicationStatus === "Approved" && user.isActive !== false;
     }
     return userRole === targetRole;
   })) {

@@ -52,6 +52,14 @@ function getRoleSuggestions(role, pageContext = "general") {
       "Meri registered machines aur listings dikhao"
     ];
   }
+  if (role === "Labour") {
+    return [
+      "Meri labour profile ka status kya hai?",
+      "Mere pending work requests dikhao",
+      "Meri listing edit karne ka tarika batao",
+      "Mere area mein aur workers dhoondo"
+    ];
+  }
   // Farmer / Customer based on page context
   if (pageContext === "labour") {
     return [
@@ -565,7 +573,8 @@ export default function AIAssistant({ pageMode = false }) {
   const userRole = String(user?.role || "").trim().toLowerCase();
   const isAdmin = Boolean(user?.isAdmin) || userRole === "admin";
   const isDriver = !isAdmin && userRole === "driver";
-  const role = isAdmin ? "Admin" : isDriver ? "Driver" : "Farmer";
+  const isLabour = !isAdmin && userRole === "labour";
+  const role = isAdmin ? "Admin" : isDriver ? "Driver" : isLabour ? "Labour" : "Farmer";
 
   // Derive explicit, normalized page context from URL pathname
   const currentPath = (location.pathname || "").toLowerCase();
@@ -614,7 +623,8 @@ export default function AIAssistant({ pageMode = false }) {
         ...(coordinates ? { currentCoordinates: coordinates } : {}),
       };
 
-      const response = await api.post("/ai/assistant", payload);
+      const assistantEndpoint = pageContext === "labour" ? "/ai/labour" : "/ai/assistant";
+      const response = await api.post(assistantEndpoint, payload);
       setMessages((current) => [...current, { role: "assistant", ...response.data }]);
     } catch (requestError) {
       setError(requestError.response?.data?.message || aiAssistantMessage("networkError", language));
@@ -704,6 +714,8 @@ export default function AIAssistant({ pageMode = false }) {
                 ? "Ask about platform stats, driver applications, complaints…"
                 : role === "Driver"
                   ? "Ask about your booking requests, earnings, listings…"
+                    : pageContext === "labour"
+                      ? "Ask about workers, professions, availability, or labour bookings…"
                   : "Ask about tractors, pricing, booking status, offers…"
             }
             aria-label="Ask WorkShetu AI Co-Pilot"

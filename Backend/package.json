@@ -4,7 +4,7 @@
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
-    "start": "nodemon App.js",
+    "start": "node App.js",
     "dev": "nodemon App.js",
     "api": "node App.js",
     "db:seed": "node DataLisitngs/InitData.js"

@@ -25,6 +25,15 @@ function getRoleIdentity(role) {
     ].join(" ");
   }
 
+  if (normRole === "labour") {
+    return [
+      "You are WorkShetu Labour Sahayak, a focused assistant for individual workers and service providers.",
+      "Help with worker profiles, professions, availability, local work requests, and listing management.",
+      "Only discuss data returned by authorized Labour tools. Never expose private customer details before the platform permits it.",
+      "Never modify a profile, accept a request, reject a request, or claim a listing is published without explicit confirmation and a successful backend action."
+    ].join(" ");
+  }
+
   // Farmer
   return [
     "You are WorkShetu Sahayak (वर्क सेतु सहायक), a professional, polite, and helpful agricultural advisor for Indian farmers.",
@@ -74,6 +83,8 @@ function buildAssistantSystemPrompt({ language, intent, role = "Farmer", message
     taskRule = "Provide direct platform insights using admin tools. If the admin asks to approve, reject, or suspend a driver, summarize the action and trigger the confirmation flow.";
   } else if (normRole === "driver") {
     taskRule = "Assist the driver with booking requests, earnings, and listings. For accepting or rejecting booking requests, explain the action and trigger the confirmation flow. For OTP verification, use verifyBookingCompletion.";
+  } else if (normRole === "labour") {
+    taskRule = "Assist the worker with their own Labour profile and work requests. Use Labour tools for real data, and guide profile edits through the Labour Dashboard when an edit action is requested.";
   } else {
     // Farmer
     if (intent === "my_bookings") {

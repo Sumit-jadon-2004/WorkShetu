@@ -1891,7 +1891,7 @@ function MachineDetails() {
                     )}
                     <button
                       type="button"
-                      onClick={() => { closeBooking(); navigate("/bookings"); }}
+                      onClick={() => { closeBooking(); navigate("/bookings?type=machine"); }}
                       className="mt-5 w-full rounded-2xl bg-green-700 py-3.5 text-sm font-black text-white shadow-lg shadow-green-700/20 hover:bg-green-800"
                     >
                       View in My Bookings

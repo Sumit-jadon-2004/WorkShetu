@@ -6,7 +6,8 @@ import {
 import {
     BrowserRouter,
     Route,
-    Routes
+    Routes,
+    Navigate
 } from "react-router-dom";
 
 
@@ -37,6 +38,9 @@ import ManageLabourListings
 
 import LabourApply
     from "./Pages/Labour/LabourApply.jsx";
+
+import RoleSelection
+    from "./Pages/Labour/RoleSelection.jsx";
 
 import DriverDashboard
     from "./Pages/Driver/DriverDashboard.jsx";
@@ -170,11 +174,8 @@ function App() {
                         <Route
                             path="/bookings"
                             element={
-
                                 <FarmerBookingsRoute>
-
                                     <MyBooking />
-
                                 </FarmerBookingsRoute>
                             }
                         />
@@ -182,11 +183,26 @@ function App() {
                         <Route
                             path="/bookings/rejected"
                             element={
-
                                 <FarmerBookingsRoute>
-
                                     <MyBooking />
+                                </FarmerBookingsRoute>
+                            }
+                        />
 
+                        <Route
+                            path="/my-bookings"
+                            element={
+                                <FarmerBookingsRoute>
+                                    <MyBooking />
+                                </FarmerBookingsRoute>
+                            }
+                        />
+
+                        <Route
+                            path="/my-bookings/rejected"
+                            element={
+                                <FarmerBookingsRoute>
+                                    <MyBooking />
                                 </FarmerBookingsRoute>
                             }
                         />
@@ -216,8 +232,40 @@ function App() {
                             element={<LabourSPage />}
                         />
                         <Route
+                            path="/labour/assistant"
+                            element={
+                                <ProtectedRoute>
+                                    <AIAssistant pageMode />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/work-with-workshetu"
+                            element={
+                                <ProtectedRoute>
+                                    <RoleSelection />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
                             path="/labour"
                             element={<LabourSPage />}
+                        />
+                        <Route
+                            path="/Labour/bookings"
+                            element={<Navigate to="/bookings?type=labour" replace />}
+                        />
+                        <Route
+                            path="/labour/bookings"
+                            element={<Navigate to="/bookings?type=labour" replace />}
+                        />
+                        <Route
+                            path="/Labour/my-bookings"
+                            element={<Navigate to="/bookings?type=labour" replace />}
+                        />
+                        <Route
+                            path="/labour/my-bookings"
+                            element={<Navigate to="/bookings?type=labour" replace />}
                         />
                         <Route
                             path="/Labour/:id"

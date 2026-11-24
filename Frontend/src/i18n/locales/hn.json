@@ -377,5 +377,26 @@
     "rights": "सर्वाधिकार सुरक्षित।",
     "farmerBottomLine": "हर बुकिंग के साथ मशीनों तक बेहतर पहुंच।",
     "driverBottomLine": "आपका काम, आपकी लिस्टिंग—एक आसान कार्यक्षेत्र।"
+  },
+  "labourProfile": {
+    "ownerCannotReview": "आप इस प्रोफ़ाइल के मालिक हैं, इसलिए अपनी सेवा की समीक्षा नहीं कर सकते।",
+    "noReviews": "अभी कोई सत्यापित समीक्षा नहीं है।",
+    "editReview": "अपनी समीक्षा संपादित करें",
+    "deleteReview": "अपनी समीक्षा हटाएँ",
+    "deleteReviewConfirm": "क्या आप अपनी समीक्षा हटाना चाहते हैं? इसे वापस नहीं किया जा सकता।",
+    "reviewUpdated": "समीक्षा अपडेट हो गई।",
+    "reviewDeleted": "समीक्षा हटा दी गई।",
+    "reviewSaveError": "समीक्षा सेव नहीं हो सकी।",
+    "reviewDeleteError": "समीक्षा हटाई नहीं जा सकी।",
+    "saveReview": "बदलाव सेव करें",
+    "ratingLabel": "रेटिंग चुनें",
+    "mapTitle": "सेवा का स्थान",
+    "locationUnavailable": "लोकेशन उपलब्ध नहीं है",
+    "approximateServiceArea": "अनुमानित सेवा क्षेत्र",
+    "serviceRadius": "सेवा का दायरा: {{radius}} किमी",
+    "useMyLocation": "मेरी लोकेशन इस्तेमाल करें",
+    "privateCoordinates": "कर्मचारी के सटीक निर्देशांक निजी हैं।",
+    "browserLocationUnsupported": "इस ब्राउज़र में लोकेशन की सुविधा उपलब्ध नहीं है।",
+    "customerLocationDenied": "आपकी लोकेशन की अनुमति नहीं मिली।"
   }
 }

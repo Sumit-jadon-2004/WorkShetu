@@ -76,6 +76,8 @@ router.get("/reviews", isLoggedIn, isAdmin, async (req, res) => {
         .limit(limitNum)
         .populate("author", "fullName phone email")
         .populate("machine", "title category image")
+        .populate("labour", "name labourType image")
+        .populate("reviewerId", "fullName phone email")
         .lean(),
     ]);
 
@@ -85,12 +87,12 @@ router.get("/reviews", isLoggedIn, isAdmin, async (req, res) => {
       reviewerPhone: r.author?.phone || "N/A",
       machine: {
         _id: r.machine?._id,
-        title: r.machine?.title || "Machine Listing",
-        category: r.machine?.category || "Tractor",
-        image: r.machine?.image?.url || null,
+        title: r.labour?.name || r.machine?.title || (r.serviceType === "Labour" ? "Labour Profile" : "Machine Listing"),
+        category: r.labour?.labourType || r.machine?.category || (r.serviceType === "Labour" ? "Labour" : "Tractor"),
+        image: r.labour?.image?.url || r.machine?.image?.url || null,
       },
       rating: r.rating || 5,
-      text: r.text || "",
+      text: r.comment || r.text || "",
       status: r.status === "Hidden" || r.isHidden === true ? "Hidden" : "Visible",
       createdAt: r.createdAt,
     }));
