@@ -1,8 +1,18 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import axios from "axios";
 
+const rawApiUrl = (
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? "https://workshetu.onrender.com" : "")
+)
+  .trim()
+  .replace(/\/+$/, "");
+
+const serverOrigin = rawApiUrl.replace(/\/api$/, "");
+const apiBaseUrl = serverOrigin ? `${serverOrigin}/api` : "/api";
+
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: apiBaseUrl,
   withCredentials: true,
 });
 

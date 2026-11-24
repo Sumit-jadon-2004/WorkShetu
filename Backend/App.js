@@ -153,31 +153,38 @@ app.use(helmet());
 // CORS
 // ======================================================
 
-const allowedOrigins = [
+const rawAllowedOrigins = [
     process.env.CLIENT_URL,
     process.env.FRONTEND_URL,
     process.env.CUSTOM_DOMAIN ? `https://${process.env.CUSTOM_DOMAIN.replace(/^https?:\/\//, "")}` : null,
     process.env.CUSTOM_DOMAIN ? `https://www.${process.env.CUSTOM_DOMAIN.replace(/^(https?:\/\/)?(www\.)?/, "")}` : null,
+    "https://work-shetu.vercel.app",
+    "https://work-shetu-klls.vercel.app",
     "http://localhost:5173",
     "http://localhost:5000",
     "http://localhost:3000",
     "http://127.0.0.1:5173"
 ].filter(Boolean);
 
+const allowedOrigins = rawAllowedOrigins.map((o) =>
+    typeof o === "string" ? o.trim().replace(/\/+$/, "").toLowerCase() : o
+);
+
 app.use(
     cors({
         origin: (origin, callback) => {
             if (!origin) return callback(null, true);
-            if (allowedOrigins.includes(origin)) return callback(null, true);
-            // Allow Vercel preview domains e.g. https://workshetu-*.vercel.app
-            if (/^https:\/\/([a-z0-9-]+)\.vercel\.app$/i.test(origin)) {
+            const normalized = origin.trim().replace(/\/+$/, "").toLowerCase();
+            if (allowedOrigins.includes(normalized)) return callback(null, true);
+            // Allow Vercel preview domains e.g. https://*.vercel.app
+            if (/^https:\/\/([a-z0-9-_.]+)\.vercel\.app$/i.test(normalized)) {
                 return callback(null, true);
             }
-            return callback(new Error(`CORS origin not allowed: ${origin}`));
+            return callback(null, false);
         },
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Cache-Control", "Pragma"]
     })
 );
 
@@ -967,37 +974,7 @@ app.delete(
 );
 
 
-// ======================================================
-// ERROR HANDLER
-// ======================================================
 
-app.use(
-    (error, req, res, next) => {
-
-        console.error(
-            "Request failed:",
-            error.message
-        );
-
-
-        if (res.headersSent) {
-
-            return next(error);
-
-        }
-
-
-        return res.status(500).json({
-
-            success: false,
-
-            message:
-                "An unexpected server error occurred."
-
-        });
-
-    }
-);
 
 
 app.post(

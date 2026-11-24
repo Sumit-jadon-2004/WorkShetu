@@ -2,10 +2,17 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import axios from "axios";
 
-// Configure production API base URL if provided in environment
-const apiBase = import.meta.env.VITE_API_URL;
-if (apiBase) {
-    axios.defaults.baseURL = apiBase.replace(/\/+$/, "");
+// Configure production API base URL if provided in environment or production mode
+const rawApiUrl = (
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.PROD ? "https://workshetu.onrender.com" : "")
+)
+    .trim()
+    .replace(/\/+$/, "");
+
+const serverOrigin = rawApiUrl.replace(/\/api$/, "");
+if (serverOrigin) {
+    axios.defaults.baseURL = serverOrigin;
 }
 axios.defaults.withCredentials = true;
 

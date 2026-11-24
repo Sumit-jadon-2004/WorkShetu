@@ -29,7 +29,10 @@ router.post("/register", authLimiter, async (req, res) => {
     return req.login(user, async (loginError) => {
       if (loginError) return res.status(500).json({ success: false, message: "Account created, but login failed." });
       const profileStatus = await resolveUserProfileStatus(user._id);
-      return res.status(201).json({ success: true, message: "Registration successful.", user: { ...safeUser(user), profileStatus } });
+      return req.session.save((saveErr) => {
+        if (saveErr) console.error("Session save error on register:", saveErr);
+        return res.status(201).json({ success: true, message: "Registration successful.", user: { ...safeUser(user), profileStatus } });
+      });
     });
   } catch (registrationError) {
     if (registrationError.code === 11000) return res.status(409).json({ success: false, message: "An account with this phone number already exists." });
@@ -48,7 +51,10 @@ router.post("/login", authLimiter, (req, res, next) => {
     return req.logIn(user, async (loginError) => {
       if (loginError) return next(loginError);
       const profileStatus = await resolveUserProfileStatus(user._id);
-      return res.json({ success: true, message: "Login successful.", user: { ...safeUser(user), profileStatus } });
+      return req.session.save((saveErr) => {
+        if (saveErr) console.error("Session save error on login:", saveErr);
+        return res.json({ success: true, message: "Login successful.", user: { ...safeUser(user), profileStatus } });
+      });
     });
   })(Object.assign(req, { body: value }), res, next);
 });
