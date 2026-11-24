@@ -120,13 +120,19 @@ const port =
 let databaseReady = false;
 
 
+const isProduction =
+    process.env.NODE_ENV === "production" ||
+    process.env.RENDER === "true" ||
+    Boolean(process.env.RENDER_SERVICE_ID) ||
+    Boolean(process.env.RENDER_EXTERNAL_URL) ||
+    Boolean(process.env.CLIENT_URL);
+
 // ======================================================
 // SESSION SECRET
 // ======================================================
 
 if (
-    process.env.NODE_ENV ===
-    "production" &&
+    isProduction &&
     !process.env.SESSION_SECRET
 ) {
 
@@ -184,7 +190,7 @@ app.use(
         },
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Cache-Control", "Pragma"]
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Cache-Control", "Pragma", "X-Session-ID"]
     })
 );
 
@@ -207,6 +213,8 @@ app.use(
 // ======================================================
 // SESSION
 // ======================================================
+
+const signature = require("cookie-signature");
 
 const sessionStore = MongoStore.create({
     mongoUrl: process.env.MONGO_URL,
@@ -231,6 +239,21 @@ sessionStore.touch = (sessionId, sessionData, callback) => {
     });
 };
 
+// Cross-origin session bridge: if third-party cookies are blocked by the browser,
+// reconstruct the signed session cookie from Authorization: Bearer <sessionId> or X-Session-ID header.
+app.use((req, res, next) => {
+    const rawHeader = req.headers["x-session-id"] ||
+        (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")
+            ? req.headers.authorization.slice(7).trim()
+            : null);
+
+    if (rawHeader && (!req.headers.cookie || !req.headers.cookie.includes("connect.sid="))) {
+        const signed = "s:" + signature.sign(rawHeader, sessionSecret);
+        req.headers.cookie = (req.headers.cookie ? req.headers.cookie + "; " : "") + "connect.sid=" + encodeURIComponent(signed);
+    }
+    next();
+});
+
 app.use(
     session({
 
@@ -248,12 +271,12 @@ app.use(
             httpOnly: true,
 
             sameSite:
-                process.env.NODE_ENV === "production"
+                isProduction
                     ? "none"
                     : "lax",
 
             secure:
-                process.env.NODE_ENV === "production",
+                isProduction,
 
             maxAge:
                 7 *

@@ -16,6 +16,19 @@ const api = axios.create({
   withCredentials: true,
 });
 
+api.interceptors.request.use((config) => {
+  config.withCredentials = true;
+  try {
+    const token = localStorage.getItem("workshetu_session_token");
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers["X-Session-ID"] = token;
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
+  } catch {}
+  return config;
+});
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -45,14 +58,26 @@ export function AuthProvider({ children }) {
       const response = await api.get("/auth/me");
 
       if (response.data?.authenticated && response.data?.user) {
+        const token = response.data?.token || response.data?.sessionId;
+        if (token) {
+          try {
+            localStorage.setItem("workshetu_session_token", token);
+          } catch {}
+        }
         setUser(response.data.user);
         return response.data.user;
       }
 
+      try {
+        localStorage.removeItem("workshetu_session_token");
+      } catch {}
       setUser(null);
       return null;
     } catch (error) {
       console.error("Failed to restore authentication:", error);
+      try {
+        localStorage.removeItem("workshetu_session_token");
+      } catch {}
       setUser(null);
       return null;
     } finally {
@@ -72,6 +97,13 @@ export function AuthProvider({ children }) {
       throw new Error("Login response did not contain user data.");
     }
 
+    const token = response.data?.token || response.data?.sessionId;
+    if (token) {
+      try {
+        localStorage.setItem("workshetu_session_token", token);
+      } catch {}
+    }
+
     setUser(response.data.user);
 
     return response.data.user;
@@ -89,6 +121,13 @@ export function AuthProvider({ children }) {
       throw new Error("Registration response did not contain user data.");
     }
 
+    const token = response.data?.token || response.data?.sessionId;
+    if (token) {
+      try {
+        localStorage.setItem("workshetu_session_token", token);
+      } catch {}
+    }
+
     setUser(response.data.user);
 
     return response.data.user;
@@ -99,6 +138,9 @@ export function AuthProvider({ children }) {
     try {
       await api.post("/auth/logout");
     } finally {
+      try {
+        localStorage.removeItem("workshetu_session_token");
+      } catch {}
       // Immediately update frontend even if server request fails.
       setUser(null);
     }

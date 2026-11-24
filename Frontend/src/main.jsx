@@ -16,6 +16,19 @@ if (serverOrigin) {
 }
 axios.defaults.withCredentials = true;
 
+axios.interceptors.request.use((config) => {
+    config.withCredentials = true;
+    try {
+        const token = localStorage.getItem("workshetu_session_token");
+        if (token) {
+            config.headers = config.headers || {};
+            config.headers["X-Session-ID"] = token;
+            config.headers["Authorization"] = `Bearer ${token}`;
+        }
+    } catch {}
+    return config;
+});
+
 import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";

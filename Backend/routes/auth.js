@@ -31,7 +31,13 @@ router.post("/register", authLimiter, async (req, res) => {
       const profileStatus = await resolveUserProfileStatus(user._id);
       return req.session.save((saveErr) => {
         if (saveErr) console.error("Session save error on register:", saveErr);
-        return res.status(201).json({ success: true, message: "Registration successful.", user: { ...safeUser(user), profileStatus } });
+        return res.status(201).json({
+          success: true,
+          message: "Registration successful.",
+          token: req.sessionID,
+          sessionId: req.sessionID,
+          user: { ...safeUser(user), profileStatus }
+        });
       });
     });
   } catch (registrationError) {
@@ -53,7 +59,13 @@ router.post("/login", authLimiter, (req, res, next) => {
       const profileStatus = await resolveUserProfileStatus(user._id);
       return req.session.save((saveErr) => {
         if (saveErr) console.error("Session save error on login:", saveErr);
-        return res.json({ success: true, message: "Login successful.", user: { ...safeUser(user), profileStatus } });
+        return res.json({
+          success: true,
+          message: "Login successful.",
+          token: req.sessionID,
+          sessionId: req.sessionID,
+          user: { ...safeUser(user), profileStatus }
+        });
       });
     });
   })(Object.assign(req, { body: value }), res, next);
@@ -75,7 +87,12 @@ router.get("/me", async (req, res) => {
     return res.json({ authenticated: false });
   }
   const profileStatus = await resolveUserProfileStatus(req.user._id);
-  return res.json({ authenticated: true, user: { ...safeUser(req.user), profileStatus } });
+  return res.json({
+    authenticated: true,
+    token: req.sessionID,
+    sessionId: req.sessionID,
+    user: { ...safeUser(req.user), profileStatus }
+  });
 });
 
 router.get("/profile", isLoggedIn, (req, res) => res.json({ success: true, user: safeUser(req.user) }));
